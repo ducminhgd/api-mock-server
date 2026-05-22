@@ -9,7 +9,7 @@ EXPOSE 3000
 CMD ["cargo", "leptos", "watch"]
 
 # ── builder ───────────────────────────────────────────────────────────────────
-FROM rust:1.87-bookworm AS builder
+FROM cgr.dev/chainguard/rust:latest-dev AS builder
 
 RUN rustup target add wasm32-unknown-unknown \
     && cargo install cargo-leptos --locked
@@ -20,14 +20,11 @@ COPY . .
 RUN cargo leptos build --release
 
 # ── prod ──────────────────────────────────────────────────────────────────────
-FROM debian:bookworm-slim AS prod
-
-RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
+FROM cgr.dev/chainguard/glibc-dynamic AS prod
 
 WORKDIR /app
-COPY --from=builder /app/target/release/api-mock-server ./server
-COPY --from=builder /app/target/site ./site
+COPY --from=builder --chown=nonroot:nonroot /app/target/release/api-mock-server ./server
+COPY --from=builder --chown=nonroot:nonroot /app/target/site ./site
 
 ENV LEPTOS_SITE_ROOT=/app/site
 EXPOSE 3000
