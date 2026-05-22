@@ -22,7 +22,7 @@ jobs:
           cache-dependency-path: backend/go.sum
 
       - name: Lint
-        uses: golangci/golangci-lint-action@v6
+        uses: golangci/golangci-lint-action@v7
         with:
           working-directory: backend
           version: v2.12.2
