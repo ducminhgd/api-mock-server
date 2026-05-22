@@ -8,6 +8,8 @@ import (
 	"gorm.io/driver/postgres"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
+
+	"github.com/ducminhgd/api-mock-server/internal/infrastructure/db/models"
 )
 
 // Connect opens a GORM connection using the given driver name and DSN.
@@ -23,4 +25,11 @@ func Connect(driver, dsn string) (*gorm.DB, error) {
 	default:
 		return nil, fmt.Errorf("unsupported db driver: %q", driver)
 	}
+}
+
+// Migrate runs auto-migration for all registered models.
+func Migrate(db *gorm.DB) error {
+	return db.AutoMigrate(
+		&models.UserModel{},
+	)
 }

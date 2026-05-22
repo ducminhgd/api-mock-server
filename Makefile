@@ -8,6 +8,7 @@ build:
 
 test:
 	$(MAKE) -C backend test
+	$(MAKE) -C frontend test
 
 lint:
 	$(MAKE) -C backend lint
