@@ -1,18 +1,21 @@
 # ── dev ──────────────────────────────────────────────────────────────────────
-FROM rust:1.87-bookworm AS dev
+FROM rust:1.95-bookworm AS dev
 
+ARG CARGO_LEPTOS_VERSION=0.2.47
 RUN rustup target add wasm32-unknown-unknown \
-    && cargo install cargo-leptos sqlx-cli --locked
+    && cargo install cargo-leptos --version "${CARGO_LEPTOS_VERSION}" --locked \
+    && cargo install sqlx-cli --locked
 
 WORKDIR /app
 EXPOSE 3000
 CMD ["cargo", "leptos", "watch"]
 
 # ── builder ───────────────────────────────────────────────────────────────────
-FROM cgr.dev/chainguard/rust:latest-dev AS builder
+FROM rust:1.95-bookworm AS builder
 
+ARG CARGO_LEPTOS_VERSION=0.2.47
 RUN rustup target add wasm32-unknown-unknown \
-    && cargo install cargo-leptos --locked
+    && cargo install cargo-leptos --version "${CARGO_LEPTOS_VERSION}" --locked
 
 WORKDIR /app
 COPY . .
