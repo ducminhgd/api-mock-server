@@ -16,13 +16,18 @@ leptos_router = { version = "0.7", features = [] }
 leptos_meta = { version = "0.7", features = [] }
 leptos_axum = { version = "0.7", optional = true }
 axum = { version = "0.7", optional = true }
+axum-extra = { version = "0.9", features = ["typed-header"], optional = true }
 tokio = { version = "1", features = ["full"], optional = true }
-sqlx = { version = "0.8", features = ["runtime-tokio", "sqlite", "postgres", "mysql", "migrate", "uuid", "chrono"], optional = true }
+sqlx = { version = "0.8", features = ["runtime-tokio", "sqlite", "postgres", "mysql", "migrate", "uuid", "chrono", "any"], optional = true }
 tower = { version = "0.5", features = ["full"], optional = true }
-tower-http = { version = "0.6", features = ["fs"], optional = true }
+tower-http = { version = "0.6", features = ["fs", "cors"], optional = true }
+async-trait = { version = "0.1", optional = true }
+bcrypt = { version = "0.15", optional = true }
+jsonwebtoken = { version = "9", optional = true }
+rand = { version = "0.8", optional = true }
 thiserror = "2"
 serde = { version = "1", features = ["derive"] }
-uuid = { version = "1", features = ["serde"] }
+uuid = { version = "1", features = ["serde", "v4"] }
 chrono = { version = "0.4", features = ["serde"] }
 wasm-bindgen = "0.2"
 
@@ -31,14 +36,18 @@ default = []
 ssr = [
     "dep:leptos_axum",
     "dep:axum",
+    "dep:axum-extra",
     "dep:tokio",
     "dep:sqlx",
     "dep:tower",
     "dep:tower-http",
+    "dep:async-trait",
+    "dep:bcrypt",
+    "dep:jsonwebtoken",
+    "dep:rand",
     "leptos/ssr",
     "leptos_router/ssr",
     "leptos_meta/ssr",
-    "uuid/v4",
 ]
 hydrate = [
     "leptos/hydrate",
