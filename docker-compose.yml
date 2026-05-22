@@ -1,0 +1,31 @@
+services:
+  backend:
+    build: ./backend
+    environment:
+      DB_DRIVER: sqlite
+      DB_DSN: /data/app.db
+      PORT: 8080
+    volumes:
+      - sqlite_data:/data
+    ports:
+      - "8080:8080"
+    networks:
+      - app_net
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    depends_on:
+      - backend
+    ports:
+      - "3000:80"
+    networks:
+      - app_net
+    restart: unless-stopped
+
+volumes:
+  sqlite_data:
+
+networks:
+  app_net:
+    driver: bridge
