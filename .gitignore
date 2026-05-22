@@ -17,19 +17,9 @@ Thumbs.db
 *.swp
 *.swo
 
-# ─── Go ───────────────────────────────────────────────────────────────────────
-backend/bin/
-backend/tmp/          # air hot-reload temp dir
-backend/coverage.out
-backend/coverage.html
-
-# ─── Node / React ─────────────────────────────────────────────────────────────
-frontend/node_modules/
-frontend/dist/
-frontend/build/
-frontend/.vite/
-frontend/coverage/
+# ─── Rust ─────────────────────────────────────────────────────────────────────
+/target
+/site
 
 # ─── Docker ───────────────────────────────────────────────────────────────────
-# Keep docker-compose files but ignore any local override secrets
 docker-compose.local.yml

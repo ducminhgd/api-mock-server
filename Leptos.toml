@@ -1,0 +1,12 @@
+[[workspace.members]]
+name = "api-mock-server"
+bin-package = "api-mock-server"
+lib-package = "api-mock-server"
+site-root = "site"
+site-pkg-dir = "pkg"
+style-file = "style/main.css"
+browserquery = "defaults"
+watch = false
+env = "DEV"
+bin-features = ["ssr"]
+lib-features = ["hydrate"]

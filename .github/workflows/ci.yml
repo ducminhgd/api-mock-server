@@ -7,50 +7,35 @@ on:
     branches: [main]
 
 jobs:
-  backend:
-    name: Backend
+  ci:
+    name: CI
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: backend
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-go@v5
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
         with:
-          go-version-file: backend/go.mod
-          cache-dependency-path: backend/go.sum
+          components: rustfmt, clippy
+          targets: wasm32-unknown-unknown
 
-      - name: Lint
-        uses: golangci/golangci-lint-action@v7
+      - name: Cache cargo registry
+        uses: actions/cache@v4
         with:
-          working-directory: backend
-          version: v2.12.2
-          args: --timeout 5m
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Format check
+        run: cargo fmt --check
+
+      - name: Clippy (ssr)
+        run: cargo clippy --features ssr -- -D warnings
+
+      - name: Clippy (hydrate)
+        run: cargo clippy --features hydrate --target wasm32-unknown-unknown -- -D warnings
 
       - name: Test
-        run: go test -race ./...
-
-  frontend:
-    name: Frontend
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: frontend
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
-
-      - name: Install
-        run: npm ci
-
-      - name: Type check
-        run: npx tsc --noEmit
-
-      - name: Build
-        run: npm run build
+        run: cargo test --features ssr
