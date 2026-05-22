@@ -1,7 +1,8 @@
 # ── dev stage ─────────────────────────────────────────────────────────────────
-FROM golang:1.24-alpine AS dev
+FROM cgr.dev/chainguard/go:latest-dev AS dev
 
-RUN apk add --no-cache git && \
+USER root
+RUN apk add --no-cache build-base && \
     go install github.com/air-verse/air@latest
 
 WORKDIR /app
@@ -14,7 +15,10 @@ EXPOSE 8080
 CMD ["air"]
 
 # ── builder stage ─────────────────────────────────────────────────────────────
-FROM golang:1.24-alpine AS builder
+FROM cgr.dev/chainguard/go:latest-dev AS builder
+
+USER root
+RUN apk add --no-cache build-base
 
 WORKDIR /app
 
@@ -22,12 +26,11 @@ COPY go.mod go.sum ./
 RUN go mod download
 
 COPY . .
-RUN CGO_ENABLED=1 GOOS=linux go build -ldflags="-s -w" -o bin/server ./cmd/server
+RUN CGO_ENABLED=1 go build -ldflags="-s -w" -o bin/server ./cmd/server
 
 # ── prod stage ────────────────────────────────────────────────────────────────
-FROM alpine:3.21 AS prod
-
-RUN apk add --no-cache ca-certificates tzdata
+# glibc-dynamic is required because the SQLite driver links against glibc via CGO.
+FROM cgr.dev/chainguard/glibc-dynamic AS prod
 
 WORKDIR /app
 
@@ -35,4 +38,4 @@ COPY --from=builder /app/bin/server ./server
 
 EXPOSE 8080
 
-CMD ["./server"]
+ENTRYPOINT ["/app/server"]

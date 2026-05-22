@@ -1,3 +1,4 @@
+// Package db provides GORM database connection helpers.
 package db
 
 import (

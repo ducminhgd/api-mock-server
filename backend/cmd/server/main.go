@@ -1,3 +1,4 @@
+// Package main is the entry point for the API mock server.
 package main
 
 import (
@@ -26,7 +27,7 @@ func main() {
 
 	r.Get("/health", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		fmt.Fprint(w, "ok")
+		_, _ = fmt.Fprint(w, "ok")
 	})
 
 	addr := fmt.Sprintf(":%s", cfg.Port)
