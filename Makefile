@@ -1,13 +1,17 @@
-.PHONY: dev build test lint
+.PHONY: dev build test migrate lint
 
 dev:
-	docker compose up
+	cargo leptos watch
 
 build:
-	docker compose build
+	cargo leptos build --release
 
 test:
-	$(MAKE) -C backend test
+	cargo test --features ssr
+
+migrate:
+	sqlx migrate run
 
 lint:
-	$(MAKE) -C backend lint
+	cargo clippy --all-targets --all-features -- -D warnings
+	cargo fmt --check

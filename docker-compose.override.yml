@@ -1,20 +1,17 @@
 services:
-  backend:
+  app:
     build:
-      context: ./backend
+      context: .
       target: dev
     volumes:
-      - ./backend:/app
-      - sqlite_data:/data
-    command: air
+      - ./src:/app/src
+      - ./style:/app/style
+      - ./public:/app/public
+      - ./migrations:/app/migrations
+      - cargo_cache:/usr/local/cargo/registry
+      - target_cache:/app/target
+    command: cargo leptos watch
 
-  frontend:
-    build:
-      context: ./frontend
-      target: dev
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
-    command: npm run dev
-    ports:
-      - "5173:5173"
+volumes:
+  cargo_cache:
+  target_cache:

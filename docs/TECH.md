@@ -2,57 +2,68 @@
 
 ## Repository Layout
 
-Backend and frontend live together in a flat monorepo. Each is self-contained with its own `Dockerfile`; a `docker-compose.yml` at the root orchestrates all services.
+The project is a single Rust workspace. Backend logic, frontend UI, and shared domain code live
+together in one crate, compiled with feature flags that gate server-only or client-only code.
+`cargo-leptos` builds and orchestrates both targets; a `Dockerfile` and `docker-compose.yml` at the
+root orchestrate deployment.
 
 ```
 api-mock-server/
-├── backend/                          # Go service
-│   ├── cmd/
-│   │   └── server/
-│   │       └── main.go               # Entry point — wires dependencies, starts HTTP server
-│   ├── internal/
-│   │   ├── domain/                   # Entities, value objects, domain errors
-│   │   ├── application/              # Use cases, repository interfaces, DTOs
-│   │   ├── adapters/                 # HTTP handlers, request/response schemas
-│   │   └── infrastructure/           # GORM models, concrete repos, config
-│   ├── migrations/                   # Versioned SQL migration files
-│   ├── go.mod
-│   ├── go.sum
-│   ├── Makefile
-│   └── Dockerfile
-├── frontend/                         # ReactJS app
-│   ├── src/
-│   │   ├── domain/                   # TypeScript interfaces, typed domain errors
-│   │   ├── application/              # Custom hooks (use cases), repository interfaces
-│   │   ├── adapters/                 # HTTP repository implementations
-│   │   ├── infrastructure/           # Axios config, storage adapters, env config
-│   │   ├── ui/                       # Pages, layouts, presentational components
-│   │   └── shared/                   # Cross-cutting utilities and hooks
-│   ├── public/
-│   ├── package.json
-│   ├── tsconfig.json
-│   └── Dockerfile
-├── docker-compose.yml                # Production-like compose (built images)
-├── docker-compose.override.yml       # Local dev overrides (volume mounts, hot reload)
-├── .env.example                      # Environment variable template
+├── src/
+│   ├── main.rs                   # Entry point (ssr only) — wires Axum, starts HTTP server
+│   ├── lib.rs                    # Leptos app root — shared by ssr and hydrate builds
+│   ├── domain/                   # Entities, value objects, domain errors (no framework imports)
+│   ├── application/              # Use cases, repository interfaces, DTOs
+│   ├── adapters/
+│   │   ├── http/                 # Axum handlers for /api/* and /mocks/* (ssr only)
+│   │   └── ui/                   # Leptos components and pages (shared)
+│   └── infrastructure/           # SQLx repos, config loading (ssr only)
+├── style/                        # Global CSS / Tailwind entry point
+├── public/                       # Static assets served directly
+├── migrations/                   # Versioned SQL migration files (sqlx-cli)
+├── Cargo.toml                    # Workspace + crate manifest
+├── Cargo.lock
+├── Makefile                      # make dev, make build, make test, make migrate
+├── Dockerfile
+├── docker-compose.yml            # Production-like compose (built image)
+├── docker-compose.override.yml   # Local dev overrides (hot reload via cargo-leptos)
+├── .env.example                  # Environment variable template
 ├── docs/
-├── Makefile                          # Top-level: make dev, make build, make test
 └── README.md
 ```
 
 ---
 
-## Backend
+## Technology Choices
 
 | Technology | Role |
 |---|---|
-| [Go](https://go.dev/) | Primary language. Compiled, statically typed, high-performance. |
-| [go-chi/chi](https://github.com/go-chi/chi) | Lightweight HTTP router. Defines REST routes, applies middleware, and groups handlers. |
-| [GORM](https://gorm.io/) | ORM for database access. Supports SQLite3, PostgreSQL, and MariaDB via driver swap. Handles migrations, queries, and associations. |
+| [Rust](https://www.rust-lang.org/) | Primary language. Memory-safe, zero-cost abstractions, single binary output. |
+| [Leptos](https://leptos.dev/) | Full-stack reactive UI framework. Components compile to WASM (client) and render on Axum (server). Replaces both React and the chi-based API layer for the admin UI. |
+| [Axum](https://github.com/tokio-rs/axum) | HTTP server framework (used by Leptos SSR integration). Handles `/api/*` management routes and `/mocks/*` mock-serving routes directly. |
+| [SQLx](https://github.com/launchbadge/sqlx) | Async database library with compile-time query verification. Supports SQLite3, PostgreSQL, and MariaDB. Replaces GORM. |
+| [cargo-leptos](https://github.com/leptos-rs/cargo-leptos) | Build tool and dev server. Compiles the WASM frontend and the Axum backend, serves them together, and provides hot reload in development. |
 
-### Architecture
+---
 
-The backend follows **Clean Architecture** with four layers. Dependencies point inward only.
+## Architecture
+
+### Build Targets and Feature Flags
+
+Leptos uses Cargo feature flags to separate code that runs only on the server from code that runs
+only in the browser (WASM):
+
+| Feature | Where it runs | What it includes |
+|---|---|---|
+| `ssr` | Axum server (native binary) | Axum handlers, SQLx repos, config loading, server functions |
+| `hydrate` | Browser (WASM) | Client-side Leptos hydration, browser-only interactivity |
+
+Shared code (domain entities, use cases, Leptos component tree) compiles under both features.
+`src/lib.rs` is the shared entry point; `src/main.rs` is `ssr`-only.
+
+### Clean Architecture Layers
+
+The same Clean Architecture layering used previously is preserved. Dependencies point inward only.
 
 ```
 infrastructure  →  adapters  →  application  →  domain
@@ -60,55 +71,40 @@ infrastructure  →  adapters  →  application  →  domain
 
 | Layer | Path | Responsibility |
 |---|---|---|
-| Domain | `internal/domain/` | Entities, value objects, typed domain errors. No framework imports. |
-| Application | `internal/application/` | Use cases, repository interfaces, DTOs. |
-| Adapters | `internal/adapters/` | HTTP handlers (chi), request/response schemas. |
-| Infrastructure | `internal/infrastructure/` | GORM models, concrete repository implementations, config loading. |
+| Domain | `src/domain/` | Entities, value objects, typed domain errors. No framework imports. `cfg`-free. |
+| Application | `src/application/` | Use cases, repository interfaces (traits), DTOs. |
+| Adapters | `src/adapters/http/` | Axum handlers for `/api` and `/mocks`. `#[server]` functions for admin UI actions. |
+| Adapters | `src/adapters/ui/` | Leptos components and pages. No direct SQLx or Axum imports. |
+| Infrastructure | `src/infrastructure/` | SQLx repository implementations, config loading. `ssr`-only. |
+
+### Server Functions
+
+Leptos server functions (`#[server]` macro) replace the REST-over-Axios pattern used in the
+previous React frontend. A component calls a server function as a plain async Rust function; Leptos
+serialises the call to an HTTP request automatically. This eliminates the adapters/api layer that
+previously lived in the React codebase.
+
+Direct REST endpoints (`/api/*`) are still exposed as Axum route handlers for external API
+consumers and are independent of the Leptos component tree.
 
 ### Key Conventions
 
-- All HTTP handlers live under `internal/adapters/http/handler/`.
-- Repository interfaces are defined in `internal/application/` and implemented in `internal/infrastructure/`.
-- `context.Context` is the first parameter on every function that performs I/O.
-- Errors are wrapped with `fmt.Errorf("...: %w", err)` for call-site context.
-
----
-
-## Frontend
-
-| Technology | Role |
-|---|---|
-| [ReactJS](https://react.dev/) | UI framework for the admin web interface. |
-| [TypeScript](https://www.typescriptlang.org/) | Type safety across all layers. Strict mode enabled. |
-| [Vite](https://vitejs.dev/) | Build tool and dev server. Proxies `/api` and `/mocks` to the backend in development. |
-| [Axios](https://axios-http.com/) | HTTP client. Used only inside the `adapters/` layer. |
-
-### Architecture
-
-The frontend mirrors the backend's Clean Architecture layering.
-
-| Layer | Path | Responsibility |
-|---|---|---|
-| Domain | `src/domain/` | TypeScript interfaces and typed domain errors. No React or Axios imports. |
-| Application | `src/application/` | Custom hooks encapsulating use-case logic. Repository interfaces (abstract ports). |
-| Adapters | `src/adapters/` | Concrete HTTP repository implementations. The only layer that imports Axios. |
-| Infrastructure | `src/infrastructure/` | Axios instance config, local storage adapters, environment variable access. |
-| UI | `src/ui/` | React pages, layout components, and reusable presentational components. |
-| Shared | `src/shared/` | Cross-cutting utilities and hooks (e.g. `useDebounce`, `formatDate`). |
-
-### Key Conventions
-
-- Business logic lives in custom hooks under `application/`, not in React components.
-- Components in `ui/` are purely presentational; they receive data and callbacks via props.
-- All HTTP calls go through `adapters/`; components and hooks never import Axios directly.
+- `#[cfg(feature = "ssr")]` gates all server-only code: SQLx, config, Axum extractors.
+- `#[cfg(feature = "hydrate")]` gates all browser-only code: `window`, `localStorage`, JS interop.
+- Repository traits are defined in `src/application/` and implemented in `src/infrastructure/`.
+- `context.Context` is replaced by Tokio's `async`/`await` and Axum's `Extension` / `State` extractors.
+- Errors are typed: domain errors in `src/domain/errors.rs`; use `thiserror` for `Display`/`Error` derives.
+- All SQL queries use `sqlx::query!` / `sqlx::query_as!` macros (compile-time checked).
 
 ---
 
 ## Database
 
-See [FEATURES.md — Databases](FEATURES.md#databases) for the supported backends (SQLite3, PostgreSQL, MariaDB).
+See [FEATURES.md — Databases](FEATURES.md#databases) for supported backends (SQLite3, PostgreSQL, MariaDB).
 
-GORM manages schema migrations and query construction. Switching backends requires only a driver and DSN configuration change — no application code changes.
+SQLx manages query execution. `sqlx-cli` runs versioned migration files in `migrations/`.
+Switching backends requires only a driver feature flag (`sqlx/sqlite`, `sqlx/postgres`,
+`sqlx/mysql`) and a DSN configuration change — no application code changes.
 
 ---
 
@@ -116,36 +112,36 @@ GORM manages schema migrations and query construction. Switching backends requir
 
 ### Docker
 
-Each service has a multi-stage `Dockerfile`:
+The `Dockerfile` is a multi-stage build:
 
-- **`dev` stage**: includes hot-reload tooling (`air` for Go, `npm run dev` / Vite for React).
-- **`prod` stage**: produces a minimal final image (distroless or Alpine).
+- **`dev` stage**: installs `cargo-leptos` and `sqlx-cli`; runs `cargo leptos watch` for hot reload.
+- **`builder` stage**: compiles both the WASM bundle and the native Axum binary via `cargo leptos build --release`.
+- **`prod` stage**: copies the compiled binary and `public/` assets into a minimal Chainguard or distroless image.
 
 ### docker-compose
 
 | File | Purpose |
 |---|---|
-| `docker-compose.yml` | Production-like setup. Builds images, no volume mounts. |
-| `docker-compose.override.yml` | Local development. Mounts source directories, enables hot reload. Applied automatically by Docker Compose when both files are present. |
+| `docker-compose.yml` | Production-like setup. Builds the image, no volume mounts. |
+| `docker-compose.override.yml` | Local development. Mounts source, runs `cargo leptos watch`. |
 
-Three services are defined:
+Two services are defined:
 
 | Service | Image | Port |
 |---|---|---|
 | `db` | `postgres:16-alpine` | internal only |
-| `backend` | built from `./backend` | `8080` |
-| `frontend` | built from `./frontend` | `3000` (prod) / `5173` (dev) |
+| `app` | built from `.` | `3000` (prod) / `3000` (dev, cargo-leptos) |
 
-The frontend's Vite dev proxy (and the Nginx config in production) forwards `/api/*` and `/mocks/*` to the backend, so the browser never makes cross-origin requests.
+The single `app` service replaces the previous separate `backend` and `frontend` services.
+Leptos SSR serves the admin UI, `/api/*`, and `/mocks/*` from the same binary on one port.
 
 ### Environment Variables
 
 Copy `.env.example` to `.env` and populate before running `docker compose up`.
 
-| Variable | Used By | Description |
-|---|---|---|
-| `DB_NAME` | `db`, `backend` | Database name |
-| `DB_USER` | `db`, `backend` | Database user |
-| `DB_PASSWORD` | `db`, `backend` | Database password |
-| `PORT` | `backend` | HTTP port the Go server listens on (default `8080`) |
-| `VITE_API_BASE` | `frontend` | Base path for API calls (default `/api`) |
+| Variable | Description |
+|---|---|
+| `DATABASE_URL` | Full DSN passed to SQLx (e.g. `postgres://user:pass@db/dbname` or `sqlite://data.db`) |
+| `PORT` | HTTP port the Axum server listens on (default `3000`) |
+| `LEPTOS_SITE_ADDR` | Address cargo-leptos / Axum binds to (default `0.0.0.0:3000`) |
+| `LEPTOS_SITE_ROOT` | Path to compiled WASM and static assets (default `site`) |
