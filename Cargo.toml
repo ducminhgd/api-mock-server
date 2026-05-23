@@ -31,6 +31,11 @@ uuid = { version = "1", features = ["serde", "v4"] }
 chrono = { version = "0.4", features = ["serde"] }
 wasm-bindgen = "0.2"
 
+# On wasm32, uuid's v4 feature needs a JS entropy source (crypto.getRandomValues).
+# Cargo merges features across sections, so this adds "js" only for WASM builds.
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+uuid = { version = "1", features = ["js"] }
+
 [features]
 default = []
 ssr = [
