@@ -1,0 +1,24 @@
+use std::sync::Arc;
+
+use axum::extract::FromRef;
+use leptos::config::LeptosOptions;
+
+use crate::application::services::auth::AuthService;
+use crate::application::services::groups::GroupService;
+use crate::application::services::users::UserService;
+use crate::infrastructure::auth::jwt::JwtIssuer;
+
+#[derive(Clone)]
+pub struct AppState {
+    pub groups: Arc<GroupService>,
+    pub users: Arc<UserService>,
+    pub auth: Arc<AuthService>,
+    pub jwt: Arc<JwtIssuer>,
+    pub leptos_options: LeptosOptions,
+}
+
+impl FromRef<AppState> for LeptosOptions {
+    fn from_ref(state: &AppState) -> Self {
+        state.leptos_options.clone()
+    }
+}

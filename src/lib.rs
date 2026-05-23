@@ -5,6 +5,8 @@ pub mod domain;
 #[cfg(feature = "ssr")]
 pub mod infrastructure;
 
+pub use domain::errors::DomainError;
+
 use adapters::ui::HomePage;
 use leptos::prelude::*;
 use leptos_meta::provide_meta_context;
