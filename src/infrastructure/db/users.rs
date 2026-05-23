@@ -9,8 +9,7 @@ fn parse_dt(s: &str) -> Result<DateTime<Utc>, crate::domain::errors::DomainError
     DateTime::parse_from_rfc3339(s)
         .map(|d| d.with_timezone(&Utc))
         .or_else(|_| {
-            chrono::NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M:%S")
-                .map(|d| d.and_utc())
+            chrono::NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M:%S").map(|d| d.and_utc())
         })
         .map_err(|e| DomainError::Internal(format!("invalid timestamp '{s}': {e}")))
 }
@@ -32,22 +31,42 @@ impl SqlxUserRepository {
 }
 
 fn row_to_user(row: &sqlx::any::AnyRow) -> Result<User, DomainError> {
-    let id_str: String = row.try_get("id").map_err(|e| DomainError::Internal(e.to_string()))?;
+    let id_str: String = row
+        .try_get("id")
+        .map_err(|e| DomainError::Internal(e.to_string()))?;
     let id = Uuid::parse_str(&id_str).map_err(|e| DomainError::Internal(e.to_string()))?;
-    let group_id_str: Option<String> = row.try_get("group_id").map_err(|e| DomainError::Internal(e.to_string()))?;
+    let group_id_str: Option<String> = row
+        .try_get("group_id")
+        .map_err(|e| DomainError::Internal(e.to_string()))?;
     let group_id = group_id_str
         .map(|s| Uuid::parse_str(&s).map_err(|e| DomainError::Internal(e.to_string())))
         .transpose()?;
-    let role_str: String = row.try_get("role").map_err(|e| DomainError::Internal(e.to_string()))?;
-    let role = role_str.parse::<UserRole>().map_err(DomainError::Internal)?;
-    let status_str: String = row.try_get("status").map_err(|e| DomainError::Internal(e.to_string()))?;
-    let status = status_str.parse::<UserStatus>().map_err(DomainError::Internal)?;
-    let created_at_str: String = row.try_get("created_at").map_err(|e| DomainError::Internal(e.to_string()))?;
-    let updated_at_str: String = row.try_get("updated_at").map_err(|e| DomainError::Internal(e.to_string()))?;
+    let role_str: String = row
+        .try_get("role")
+        .map_err(|e| DomainError::Internal(e.to_string()))?;
+    let role = role_str
+        .parse::<UserRole>()
+        .map_err(DomainError::Internal)?;
+    let status_str: String = row
+        .try_get("status")
+        .map_err(|e| DomainError::Internal(e.to_string()))?;
+    let status = status_str
+        .parse::<UserStatus>()
+        .map_err(DomainError::Internal)?;
+    let created_at_str: String = row
+        .try_get("created_at")
+        .map_err(|e| DomainError::Internal(e.to_string()))?;
+    let updated_at_str: String = row
+        .try_get("updated_at")
+        .map_err(|e| DomainError::Internal(e.to_string()))?;
     Ok(User {
         id,
-        username: row.try_get("username").map_err(|e| DomainError::Internal(e.to_string()))?,
-        password_hash: row.try_get("password_hash").map_err(|e| DomainError::Internal(e.to_string()))?,
+        username: row
+            .try_get("username")
+            .map_err(|e| DomainError::Internal(e.to_string()))?,
+        password_hash: row
+            .try_get("password_hash")
+            .map_err(|e| DomainError::Internal(e.to_string()))?,
         group_id,
         role,
         status,
@@ -77,9 +96,12 @@ impl UserRepository for SqlxUserRepository {
                AND (? IS NULL OR status = ?) \
              ORDER BY username ASC LIMIT ? OFFSET ?",
         )
-        .bind(&search).bind(&search)
-        .bind(&group_id).bind(&group_id)
-        .bind(&status).bind(&status)
+        .bind(&search)
+        .bind(&search)
+        .bind(&group_id)
+        .bind(&group_id)
+        .bind(&status)
+        .bind(&status)
         .bind(limit)
         .bind(offset)
         .fetch_all(&self.pool)
@@ -92,14 +114,20 @@ impl UserRepository for SqlxUserRepository {
                AND (? IS NULL OR group_id = ?) \
                AND (? IS NULL OR status = ?)",
         )
-        .bind(&search).bind(&search)
-        .bind(&group_id).bind(&group_id)
-        .bind(&status).bind(&status)
+        .bind(&search)
+        .bind(&search)
+        .bind(&group_id)
+        .bind(&group_id)
+        .bind(&status)
+        .bind(&status)
         .fetch_one(&self.pool)
         .await
         .map_err(|e| DomainError::Internal(e.to_string()))?;
 
-        let users = rows.iter().map(row_to_user).collect::<Result<Vec<_>, _>>()?;
+        let users = rows
+            .iter()
+            .map(row_to_user)
+            .collect::<Result<Vec<_>, _>>()?;
         Ok((users, total as u64))
     }
 

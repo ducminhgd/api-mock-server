@@ -24,7 +24,10 @@ pub fn router() -> Router<AppState> {
         .route("/:id", get(get_one).put(update).delete(remove))
         .route("/:id/duplicate", post(duplicate))
         .route("/:id/shares", get(list_shares).post(add_share))
-        .route("/:id/shares/:share_id", put(update_share).delete(remove_share))
+        .route(
+            "/:id/shares/:share_id",
+            put(update_share).delete(remove_share),
+        )
         .route("/:id/transfer", put(transfer_ownership))
 }
 
@@ -42,9 +45,15 @@ async fn list(
     State(state): State<AppState>,
     Query(q): Query<ListQuery>,
 ) -> Result<Json<Paginated<CollectionResponse>>, ApiError> {
-    let filter =
-        CollectionFilter { search: q.search, status: q.status, visibility: q.visibility };
-    let page = PageParams { page: q.page.unwrap_or(1), limit: q.limit.unwrap_or(20) };
+    let filter = CollectionFilter {
+        search: q.search,
+        status: q.status,
+        visibility: q.visibility,
+    };
+    let page = PageParams {
+        page: q.page.unwrap_or(1),
+        limit: q.limit.unwrap_or(20),
+    };
     state
         .collections
         .list(auth.user_id, filter, page)
@@ -58,7 +67,11 @@ async fn create(
     State(state): State<AppState>,
     Json(req): Json<CreateCollectionRequest>,
 ) -> Result<(StatusCode, Json<CollectionResponse>), ApiError> {
-    let resp = state.collections.create(auth.user_id, req).await.map_err(ApiError::from)?;
+    let resp = state
+        .collections
+        .create(auth.user_id, req)
+        .await
+        .map_err(ApiError::from)?;
     Ok((StatusCode::CREATED, Json(resp)))
 }
 
@@ -67,7 +80,12 @@ async fn get_one(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<CollectionResponse>, ApiError> {
-    state.collections.get(id, auth.user_id).await.map(Json).map_err(ApiError::from)
+    state
+        .collections
+        .get(id, auth.user_id)
+        .await
+        .map(Json)
+        .map_err(ApiError::from)
 }
 
 async fn update(
@@ -76,7 +94,12 @@ async fn update(
     Path(id): Path<Uuid>,
     Json(req): Json<UpdateCollectionRequest>,
 ) -> Result<Json<CollectionResponse>, ApiError> {
-    state.collections.update(id, auth.user_id, req).await.map(Json).map_err(ApiError::from)
+    state
+        .collections
+        .update(id, auth.user_id, req)
+        .await
+        .map(Json)
+        .map_err(ApiError::from)
 }
 
 async fn remove(
@@ -84,7 +107,11 @@ async fn remove(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
 ) -> Result<StatusCode, ApiError> {
-    state.collections.delete(id, auth.user_id).await.map_err(ApiError::from)?;
+    state
+        .collections
+        .delete(id, auth.user_id)
+        .await
+        .map_err(ApiError::from)?;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -93,7 +120,11 @@ async fn duplicate(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
 ) -> Result<(StatusCode, Json<CollectionResponse>), ApiError> {
-    let resp = state.collections.duplicate(id, auth.user_id).await.map_err(ApiError::from)?;
+    let resp = state
+        .collections
+        .duplicate(id, auth.user_id)
+        .await
+        .map_err(ApiError::from)?;
     Ok((StatusCode::CREATED, Json(resp)))
 }
 
@@ -102,7 +133,12 @@ async fn list_shares(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<Vec<CollectionShareResponse>>, ApiError> {
-    state.collections.list_shares(id, auth.user_id).await.map(Json).map_err(ApiError::from)
+    state
+        .collections
+        .list_shares(id, auth.user_id)
+        .await
+        .map(Json)
+        .map_err(ApiError::from)
 }
 
 async fn add_share(
@@ -111,8 +147,11 @@ async fn add_share(
     Path(id): Path<Uuid>,
     Json(req): Json<CreateShareRequest>,
 ) -> Result<(StatusCode, Json<CollectionShareResponse>), ApiError> {
-    let resp =
-        state.collections.add_share(id, auth.user_id, req).await.map_err(ApiError::from)?;
+    let resp = state
+        .collections
+        .add_share(id, auth.user_id, req)
+        .await
+        .map_err(ApiError::from)?;
     Ok((StatusCode::CREATED, Json(resp)))
 }
 

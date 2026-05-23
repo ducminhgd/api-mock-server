@@ -33,9 +33,21 @@ async fn list(
     State(state): State<AppState>,
     Query(q): Query<ListQuery>,
 ) -> Result<Json<Paginated<UserResponse>>, ApiError> {
-    let filter = UserFilter { search: q.search, group_id: q.group_id, status: q.status };
-    let page = PageParams { page: q.page.unwrap_or(1), limit: q.limit.unwrap_or(20) };
-    state.users.list(filter, page).await.map(Json).map_err(ApiError::from)
+    let filter = UserFilter {
+        search: q.search,
+        group_id: q.group_id,
+        status: q.status,
+    };
+    let page = PageParams {
+        page: q.page.unwrap_or(1),
+        limit: q.limit.unwrap_or(20),
+    };
+    state
+        .users
+        .list(filter, page)
+        .await
+        .map(Json)
+        .map_err(ApiError::from)
 }
 
 async fn create(
@@ -58,7 +70,12 @@ async fn update(
     Path(id): Path<Uuid>,
     Json(req): Json<UpdateUserRequest>,
 ) -> Result<Json<UserResponse>, ApiError> {
-    state.users.update(id, req).await.map(Json).map_err(ApiError::from)
+    state
+        .users
+        .update(id, req)
+        .await
+        .map(Json)
+        .map_err(ApiError::from)
 }
 
 async fn remove(
@@ -73,5 +90,10 @@ async fn reset_password(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<ResetPasswordResponse>, ApiError> {
-    state.users.reset_password(id).await.map(Json).map_err(ApiError::from)
+    state
+        .users
+        .reset_password(id)
+        .await
+        .map(Json)
+        .map_err(ApiError::from)
 }

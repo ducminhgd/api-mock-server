@@ -216,7 +216,10 @@ mod tests {
 
     #[test]
     fn user_status_display_roundtrip() {
-        for (status, s) in [(UserStatus::Active, "active"), (UserStatus::Inactive, "inactive")] {
+        for (status, s) in [
+            (UserStatus::Active, "active"),
+            (UserStatus::Inactive, "inactive"),
+        ] {
             assert_eq!(status.to_string(), s);
             assert_eq!(s.parse::<UserStatus>().unwrap(), status);
         }

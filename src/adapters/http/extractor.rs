@@ -37,12 +37,22 @@ where
                     )
                 })?;
 
-        let claims = app_state.jwt.verify(bearer.token()).map_err(ApiError::from)?;
+        let claims = app_state
+            .jwt
+            .verify(bearer.token())
+            .map_err(ApiError::from)?;
 
         let user_id = Uuid::parse_str(&claims.sub).map_err(|_| {
-            ApiError(StatusCode::UNAUTHORIZED, "UNAUTHORIZED", "invalid token subject".into())
+            ApiError(
+                StatusCode::UNAUTHORIZED,
+                "UNAUTHORIZED",
+                "invalid token subject".into(),
+            )
         })?;
 
-        Ok(AuthUser { user_id, role: claims.role })
+        Ok(AuthUser {
+            user_id,
+            role: claims.role,
+        })
     }
 }

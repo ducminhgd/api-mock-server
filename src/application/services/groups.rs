@@ -94,7 +94,13 @@ mod tests {
     #[tokio::test]
     async fn list_empty_store() {
         let result = empty()
-            .list(GroupFilter { search: None, status: None }, PageParams::default())
+            .list(
+                GroupFilter {
+                    search: None,
+                    status: None,
+                },
+                PageParams::default(),
+            )
             .await
             .unwrap();
         assert!(result.data.is_empty());
@@ -103,10 +109,19 @@ mod tests {
 
     #[tokio::test]
     async fn list_returns_all_groups() {
-        let result = svc(vec![Group::new("A".into(), None), Group::new("B".into(), None)])
-            .list(GroupFilter { search: None, status: None }, PageParams::default())
-            .await
-            .unwrap();
+        let result = svc(vec![
+            Group::new("A".into(), None),
+            Group::new("B".into(), None),
+        ])
+        .list(
+            GroupFilter {
+                search: None,
+                status: None,
+            },
+            PageParams::default(),
+        )
+        .await
+        .unwrap();
         assert_eq!(result.meta.total, 2);
         assert_eq!(result.data.len(), 2);
     }
@@ -117,7 +132,13 @@ mod tests {
             Group::new("Engineering".into(), None),
             Group::new("Marketing".into(), None),
         ])
-        .list(GroupFilter { search: Some("Eng".into()), status: None }, PageParams::default())
+        .list(
+            GroupFilter {
+                search: Some("Eng".into()),
+                status: None,
+            },
+            PageParams::default(),
+        )
         .await
         .unwrap();
         assert_eq!(result.meta.total, 1);
@@ -130,7 +151,10 @@ mod tests {
         inactive.status = GroupStatus::Inactive;
         let result = svc(vec![inactive, Group::new("B".into(), None)])
             .list(
-                GroupFilter { search: None, status: Some(GroupStatus::Active) },
+                GroupFilter {
+                    search: None,
+                    status: Some(GroupStatus::Active),
+                },
                 PageParams::default(),
             )
             .await
@@ -157,7 +181,10 @@ mod tests {
     #[tokio::test]
     async fn create_saves_new_group() {
         let resp = empty()
-            .create(CreateGroupRequest { name: "DevOps".into(), description: None })
+            .create(CreateGroupRequest {
+                name: "DevOps".into(),
+                description: None,
+            })
             .await
             .unwrap();
         assert_eq!(resp.name, "DevOps");
@@ -167,7 +194,10 @@ mod tests {
     async fn create_rejects_duplicate_name() {
         let g = Group::new("DevOps".into(), None);
         let err = svc(vec![g])
-            .create(CreateGroupRequest { name: "DevOps".into(), description: None })
+            .create(CreateGroupRequest {
+                name: "DevOps".into(),
+                description: None,
+            })
             .await
             .unwrap_err();
         assert!(matches!(err, DomainError::GroupNameTaken(_)));
@@ -178,7 +208,14 @@ mod tests {
         let g = Group::new("OldName".into(), None);
         let id = g.id;
         let resp = svc(vec![g])
-            .update(id, UpdateGroupRequest { name: Some("NewName".into()), description: None, status: None })
+            .update(
+                id,
+                UpdateGroupRequest {
+                    name: Some("NewName".into()),
+                    description: None,
+                    status: None,
+                },
+            )
             .await
             .unwrap();
         assert_eq!(resp.name, "NewName");
@@ -190,7 +227,14 @@ mod tests {
         let g2 = Group::new("Beta".into(), None);
         let id2 = g2.id;
         let err = svc(vec![g1, g2])
-            .update(id2, UpdateGroupRequest { name: Some("Alpha".into()), description: None, status: None })
+            .update(
+                id2,
+                UpdateGroupRequest {
+                    name: Some("Alpha".into()),
+                    description: None,
+                    status: None,
+                },
+            )
             .await
             .unwrap_err();
         assert!(matches!(err, DomainError::GroupNameTaken(_)));
@@ -201,7 +245,14 @@ mod tests {
         let g = Group::new("Alpha".into(), None);
         let id = g.id;
         let resp = svc(vec![g])
-            .update(id, UpdateGroupRequest { name: Some("Alpha".into()), description: None, status: None })
+            .update(
+                id,
+                UpdateGroupRequest {
+                    name: Some("Alpha".into()),
+                    description: None,
+                    status: None,
+                },
+            )
             .await
             .unwrap();
         assert_eq!(resp.name, "Alpha");
@@ -213,7 +264,10 @@ mod tests {
         let id = g.id;
         let service = svc(vec![g]);
         service.delete(id).await.unwrap();
-        assert!(matches!(service.get(id).await.unwrap_err(), DomainError::GroupNotFound(_)));
+        assert!(matches!(
+            service.get(id).await.unwrap_err(),
+            DomainError::GroupNotFound(_)
+        ));
     }
 
     #[tokio::test]

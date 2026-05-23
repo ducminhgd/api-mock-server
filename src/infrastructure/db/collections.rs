@@ -30,26 +30,41 @@ fn parse_dt(s: &str) -> Result<DateTime<Utc>, DomainError> {
 }
 
 fn row_to_collection(row: &sqlx::any::AnyRow) -> Result<Collection, DomainError> {
-    let id_str: String = row.try_get("id").map_err(|e| DomainError::Internal(e.to_string()))?;
+    let id_str: String = row
+        .try_get("id")
+        .map_err(|e| DomainError::Internal(e.to_string()))?;
     let id = Uuid::parse_str(&id_str).map_err(|e| DomainError::Internal(e.to_string()))?;
-    let owner_id_str: String =
-        row.try_get("owner_id").map_err(|e| DomainError::Internal(e.to_string()))?;
-    let owner_id = Uuid::parse_str(&owner_id_str).map_err(|e| DomainError::Internal(e.to_string()))?;
-    let status_str: String =
-        row.try_get("status").map_err(|e| DomainError::Internal(e.to_string()))?;
-    let status = status_str.parse::<CollectionStatus>().map_err(DomainError::Internal)?;
-    let visibility_str: String =
-        row.try_get("visibility").map_err(|e| DomainError::Internal(e.to_string()))?;
-    let visibility =
-        visibility_str.parse::<CollectionVisibility>().map_err(DomainError::Internal)?;
-    let created_at_str: String =
-        row.try_get("created_at").map_err(|e| DomainError::Internal(e.to_string()))?;
-    let updated_at_str: String =
-        row.try_get("updated_at").map_err(|e| DomainError::Internal(e.to_string()))?;
+    let owner_id_str: String = row
+        .try_get("owner_id")
+        .map_err(|e| DomainError::Internal(e.to_string()))?;
+    let owner_id =
+        Uuid::parse_str(&owner_id_str).map_err(|e| DomainError::Internal(e.to_string()))?;
+    let status_str: String = row
+        .try_get("status")
+        .map_err(|e| DomainError::Internal(e.to_string()))?;
+    let status = status_str
+        .parse::<CollectionStatus>()
+        .map_err(DomainError::Internal)?;
+    let visibility_str: String = row
+        .try_get("visibility")
+        .map_err(|e| DomainError::Internal(e.to_string()))?;
+    let visibility = visibility_str
+        .parse::<CollectionVisibility>()
+        .map_err(DomainError::Internal)?;
+    let created_at_str: String = row
+        .try_get("created_at")
+        .map_err(|e| DomainError::Internal(e.to_string()))?;
+    let updated_at_str: String = row
+        .try_get("updated_at")
+        .map_err(|e| DomainError::Internal(e.to_string()))?;
     Ok(Collection {
         id,
-        name: row.try_get("name").map_err(|e| DomainError::Internal(e.to_string()))?,
-        description: row.try_get("description").map_err(|e| DomainError::Internal(e.to_string()))?,
+        name: row
+            .try_get("name")
+            .map_err(|e| DomainError::Internal(e.to_string()))?,
+        description: row
+            .try_get("description")
+            .map_err(|e| DomainError::Internal(e.to_string()))?,
         owner_id,
         status,
         visibility,
@@ -125,7 +140,10 @@ impl CollectionRepository for SqlxCollectionRepository {
         .await
         .map_err(|e| DomainError::Internal(e.to_string()))?;
 
-        let collections = rows.iter().map(row_to_collection).collect::<Result<Vec<_>, _>>()?;
+        let collections = rows
+            .iter()
+            .map(row_to_collection)
+            .collect::<Result<Vec<_>, _>>()?;
         Ok((collections, total as u64))
     }
 

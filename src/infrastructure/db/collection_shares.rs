@@ -28,29 +28,39 @@ fn parse_dt(s: &str) -> Result<DateTime<Utc>, DomainError> {
 }
 
 fn row_to_share(row: &sqlx::any::AnyRow) -> Result<CollectionShare, DomainError> {
-    let id_str: String = row.try_get("id").map_err(|e| DomainError::Internal(e.to_string()))?;
+    let id_str: String = row
+        .try_get("id")
+        .map_err(|e| DomainError::Internal(e.to_string()))?;
     let id = Uuid::parse_str(&id_str).map_err(|e| DomainError::Internal(e.to_string()))?;
-    let collection_id_str: String =
-        row.try_get("collection_id").map_err(|e| DomainError::Internal(e.to_string()))?;
+    let collection_id_str: String = row
+        .try_get("collection_id")
+        .map_err(|e| DomainError::Internal(e.to_string()))?;
     let collection_id =
         Uuid::parse_str(&collection_id_str).map_err(|e| DomainError::Internal(e.to_string()))?;
-    let user_id_str: Option<String> =
-        row.try_get("user_id").map_err(|e| DomainError::Internal(e.to_string()))?;
+    let user_id_str: Option<String> = row
+        .try_get("user_id")
+        .map_err(|e| DomainError::Internal(e.to_string()))?;
     let user_id = user_id_str
         .map(|s| Uuid::parse_str(&s).map_err(|e| DomainError::Internal(e.to_string())))
         .transpose()?;
-    let group_id_str: Option<String> =
-        row.try_get("group_id").map_err(|e| DomainError::Internal(e.to_string()))?;
+    let group_id_str: Option<String> = row
+        .try_get("group_id")
+        .map_err(|e| DomainError::Internal(e.to_string()))?;
     let group_id = group_id_str
         .map(|s| Uuid::parse_str(&s).map_err(|e| DomainError::Internal(e.to_string())))
         .transpose()?;
-    let role_str: String =
-        row.try_get("role").map_err(|e| DomainError::Internal(e.to_string()))?;
-    let role = role_str.parse::<ShareRole>().map_err(DomainError::Internal)?;
-    let created_at_str: String =
-        row.try_get("created_at").map_err(|e| DomainError::Internal(e.to_string()))?;
-    let updated_at_str: String =
-        row.try_get("updated_at").map_err(|e| DomainError::Internal(e.to_string()))?;
+    let role_str: String = row
+        .try_get("role")
+        .map_err(|e| DomainError::Internal(e.to_string()))?;
+    let role = role_str
+        .parse::<ShareRole>()
+        .map_err(DomainError::Internal)?;
+    let created_at_str: String = row
+        .try_get("created_at")
+        .map_err(|e| DomainError::Internal(e.to_string()))?;
+    let updated_at_str: String = row
+        .try_get("updated_at")
+        .map_err(|e| DomainError::Internal(e.to_string()))?;
     Ok(CollectionShare {
         id,
         collection_id,

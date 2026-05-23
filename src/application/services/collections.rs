@@ -28,7 +28,11 @@ impl CollectionService {
         share_repo: Arc<dyn CollectionShareRepository>,
         user_repo: Arc<dyn UserRepository>,
     ) -> Self {
-        Self { collection_repo, share_repo, user_repo }
+        Self {
+            collection_repo,
+            share_repo,
+            user_repo,
+        }
     }
 
     pub async fn list(
@@ -37,13 +41,19 @@ impl CollectionService {
         filter: CollectionFilter,
         page: PageParams,
     ) -> Result<Paginated<CollectionResponse>, DomainError> {
-        let page = PageParams { limit: page.clamped_limit(), ..page };
+        let page = PageParams {
+            limit: page.clamped_limit(),
+            ..page
+        };
         let caller = self.user_repo.find_by_id(caller_id).await?;
         let (collections, total) = self
             .collection_repo
             .find_all(caller_id, caller.group_id, &filter, &page)
             .await?;
-        let data = collections.into_iter().map(CollectionResponse::from).collect();
+        let data = collections
+            .into_iter()
+            .map(CollectionResponse::from)
+            .collect();
         Ok(Paginated::new(data, total, &page))
     }
 
@@ -119,7 +129,10 @@ impl CollectionService {
             return Err(DomainError::Forbidden);
         }
         let shares = self.share_repo.find_by_collection(id).await?;
-        Ok(shares.into_iter().map(CollectionShareResponse::from).collect())
+        Ok(shares
+            .into_iter()
+            .map(CollectionShareResponse::from)
+            .collect())
     }
 
     pub async fn add_share(
@@ -134,14 +147,28 @@ impl CollectionService {
         }
         let share = match (req.user_id, req.group_id) {
             (Some(uid), None) => {
-                if self.share_repo.find_existing(id, Some(uid), None).await?.is_some() {
-                    return Err(DomainError::Conflict("already shared with this user".into()));
+                if self
+                    .share_repo
+                    .find_existing(id, Some(uid), None)
+                    .await?
+                    .is_some()
+                {
+                    return Err(DomainError::Conflict(
+                        "already shared with this user".into(),
+                    ));
                 }
                 CollectionShare::new_user(id, uid, req.role)
             }
             (None, Some(gid)) => {
-                if self.share_repo.find_existing(id, None, Some(gid)).await?.is_some() {
-                    return Err(DomainError::Conflict("already shared with this group".into()));
+                if self
+                    .share_repo
+                    .find_existing(id, None, Some(gid))
+                    .await?
+                    .is_some()
+                {
+                    return Err(DomainError::Conflict(
+                        "already shared with this group".into(),
+                    ));
                 }
                 CollectionShare::new_group(id, gid, req.role)
             }
@@ -231,7 +258,8 @@ mod tests {
 
     use super::*;
     use crate::application::dto::collection::{
-        CollectionFilter, CreateCollectionRequest, TransferOwnershipRequest, UpdateCollectionRequest,
+        CollectionFilter, CreateCollectionRequest, TransferOwnershipRequest,
+        UpdateCollectionRequest,
     };
     use crate::application::dto::collection_share::{CreateShareRequest, UpdateShareRequest};
     use crate::application::dto::pagination::PageParams;
@@ -252,7 +280,11 @@ mod tests {
     }
 
     fn no_filter() -> CollectionFilter {
-        CollectionFilter { search: None, status: None, visibility: None }
+        CollectionFilter {
+            search: None,
+            status: None,
+            visibility: None,
+        }
     }
 
     fn svc(
@@ -279,7 +311,10 @@ mod tests {
     async fn list_empty_store_returns_empty_page() {
         let caller = make_user("alice");
         let (service, caller_id) = empty_svc(caller);
-        let result = service.list(caller_id, no_filter(), PageParams::default()).await.unwrap();
+        let result = service
+            .list(caller_id, no_filter(), PageParams::default())
+            .await
+            .unwrap();
         assert!(result.data.is_empty());
         assert_eq!(result.meta.total, 0);
     }
@@ -292,7 +327,10 @@ mod tests {
         let mine = make_collection("Mine", owner_id);
         let theirs = make_collection("Theirs", other_id);
         let (service, caller_id) = svc(owner, vec![mine, theirs], vec![]);
-        let result = service.list(caller_id, no_filter(), PageParams::default()).await.unwrap();
+        let result = service
+            .list(caller_id, no_filter(), PageParams::default())
+            .await
+            .unwrap();
         assert_eq!(result.meta.total, 1);
         assert_eq!(result.data[0].name, "Mine");
     }
@@ -303,13 +341,20 @@ mod tests {
         let owner_id = owner.id;
         let (service, caller_id) = svc(
             owner,
-            vec![make_collection("Alpha", owner_id), make_collection("Beta", owner_id)],
+            vec![
+                make_collection("Alpha", owner_id),
+                make_collection("Beta", owner_id),
+            ],
             vec![],
         );
         let result = service
             .list(
                 caller_id,
-                CollectionFilter { search: Some("Alp".into()), status: None, visibility: None },
+                CollectionFilter {
+                    search: Some("Alp".into()),
+                    status: None,
+                    visibility: None,
+                },
                 PageParams::default(),
             )
             .await
@@ -346,7 +391,12 @@ mod tests {
     async fn list_filters_by_visibility() {
         let owner = make_user("alice");
         let owner_id = owner.id;
-        let public = Collection::new("Public".into(), None, owner_id, CollectionVisibility::Public);
+        let public = Collection::new(
+            "Public".into(),
+            None,
+            owner_id,
+            CollectionVisibility::Public,
+        );
         let private = make_collection("Private", owner_id);
         let (service, caller_id) = svc(owner, vec![public, private], vec![]);
         let result = service
@@ -372,7 +422,10 @@ mod tests {
             Arc::new(FakeCollectionShareRepo::empty()),
             Arc::new(FakeUserRepo::empty()),
         );
-        let err = service.list(Uuid::new_v4(), no_filter(), PageParams::default()).await.unwrap_err();
+        let err = service
+            .list(Uuid::new_v4(), no_filter(), PageParams::default())
+            .await
+            .unwrap_err();
         assert!(matches!(err, DomainError::UserNotFound(_)));
     }
 
@@ -399,9 +452,9 @@ mod tests {
         // Build a fresh service with both users seeded so user lookup works for both owner and viewer.
         let service = CollectionService::new(
             Arc::new(FakeCollectionRepo::with(vec![c.clone()])),
-            Arc::new(FakeCollectionShareRepo::with(vec![CollectionShare::new_user(
-                c.id, viewer_id, ShareRole::Viewer,
-            )])),
+            Arc::new(FakeCollectionShareRepo::with(vec![
+                CollectionShare::new_user(c.id, viewer_id, ShareRole::Viewer),
+            ])),
             Arc::new(FakeUserRepo::with(vec![owner, viewer])),
         );
         let resp = service.get(c.id, viewer_id).await.unwrap();
@@ -440,7 +493,11 @@ mod tests {
         let resp = service
             .create(
                 caller_id,
-                CreateCollectionRequest { name: "New".into(), description: None, visibility: None },
+                CreateCollectionRequest {
+                    name: "New".into(),
+                    description: None,
+                    visibility: None,
+                },
             )
             .await
             .unwrap();
@@ -455,7 +512,11 @@ mod tests {
         let resp = service
             .create(
                 caller_id,
-                CreateCollectionRequest { name: "C".into(), description: None, visibility: None },
+                CreateCollectionRequest {
+                    name: "C".into(),
+                    description: None,
+                    visibility: None,
+                },
             )
             .await
             .unwrap();
@@ -538,7 +599,12 @@ mod tests {
             .update(
                 c.id,
                 stranger_id,
-                UpdateCollectionRequest { name: Some("X".into()), description: None, status: None, visibility: None },
+                UpdateCollectionRequest {
+                    name: Some("X".into()),
+                    description: None,
+                    status: None,
+                    visibility: None,
+                },
             )
             .await
             .unwrap_err();
@@ -553,7 +619,12 @@ mod tests {
             .update(
                 Uuid::new_v4(),
                 caller_id,
-                UpdateCollectionRequest { name: None, description: None, status: None, visibility: None },
+                UpdateCollectionRequest {
+                    name: None,
+                    description: None,
+                    status: None,
+                    visibility: None,
+                },
             )
             .await
             .unwrap_err();
@@ -646,7 +717,10 @@ mod tests {
     async fn duplicate_returns_not_found_for_unknown_collection() {
         let caller = make_user("alice");
         let (service, caller_id) = empty_svc(caller);
-        let err = service.duplicate(Uuid::new_v4(), caller_id).await.unwrap_err();
+        let err = service
+            .duplicate(Uuid::new_v4(), caller_id)
+            .await
+            .unwrap_err();
         assert!(matches!(err, DomainError::CollectionNotFound(_)));
     }
 
@@ -692,7 +766,11 @@ mod tests {
             .add_share(
                 c.id,
                 caller_id,
-                CreateShareRequest { user_id: Some(target_user), group_id: None, role: ShareRole::Viewer },
+                CreateShareRequest {
+                    user_id: Some(target_user),
+                    group_id: None,
+                    role: ShareRole::Viewer,
+                },
             )
             .await
             .unwrap();
@@ -711,7 +789,11 @@ mod tests {
             .add_share(
                 c.id,
                 caller_id,
-                CreateShareRequest { user_id: None, group_id: Some(target_group), role: ShareRole::Editor },
+                CreateShareRequest {
+                    user_id: None,
+                    group_id: Some(target_group),
+                    role: ShareRole::Editor,
+                },
             )
             .await
             .unwrap();
@@ -731,7 +813,11 @@ mod tests {
             .add_share(
                 c.id,
                 caller_id,
-                CreateShareRequest { user_id: Some(target), group_id: None, role: ShareRole::Editor },
+                CreateShareRequest {
+                    user_id: Some(target),
+                    group_id: None,
+                    role: ShareRole::Editor,
+                },
             )
             .await
             .unwrap_err();
@@ -750,7 +836,11 @@ mod tests {
             .add_share(
                 c.id,
                 caller_id,
-                CreateShareRequest { user_id: None, group_id: Some(target), role: ShareRole::Editor },
+                CreateShareRequest {
+                    user_id: None,
+                    group_id: Some(target),
+                    role: ShareRole::Editor,
+                },
             )
             .await
             .unwrap_err();
@@ -788,7 +878,11 @@ mod tests {
             .add_share(
                 c.id,
                 caller_id,
-                CreateShareRequest { user_id: None, group_id: None, role: ShareRole::Viewer },
+                CreateShareRequest {
+                    user_id: None,
+                    group_id: None,
+                    role: ShareRole::Viewer,
+                },
             )
             .await
             .unwrap_err();
@@ -810,7 +904,11 @@ mod tests {
             .add_share(
                 c.id,
                 stranger_id,
-                CreateShareRequest { user_id: Some(Uuid::new_v4()), group_id: None, role: ShareRole::Viewer },
+                CreateShareRequest {
+                    user_id: Some(Uuid::new_v4()),
+                    group_id: None,
+                    role: ShareRole::Viewer,
+                },
             )
             .await
             .unwrap_err();
@@ -828,7 +926,14 @@ mod tests {
         let share_id = share.id;
         let (service, caller_id) = svc(owner, vec![c.clone()], vec![share]);
         let resp = service
-            .update_share(c.id, share_id, caller_id, UpdateShareRequest { role: ShareRole::Editor })
+            .update_share(
+                c.id,
+                share_id,
+                caller_id,
+                UpdateShareRequest {
+                    role: ShareRole::Editor,
+                },
+            )
             .await
             .unwrap();
         assert_eq!(resp.role, ShareRole::Editor);
@@ -848,7 +953,14 @@ mod tests {
             Arc::new(FakeUserRepo::with(vec![owner, stranger])),
         );
         let err = service
-            .update_share(c.id, share_id, stranger_id, UpdateShareRequest { role: ShareRole::Editor })
+            .update_share(
+                c.id,
+                share_id,
+                stranger_id,
+                UpdateShareRequest {
+                    role: ShareRole::Editor,
+                },
+            )
             .await
             .unwrap_err();
         assert!(matches!(err, DomainError::Forbidden));
@@ -861,7 +973,14 @@ mod tests {
         let c = make_collection("C", owner_id);
         let (service, caller_id) = svc(owner, vec![c.clone()], vec![]);
         let err = service
-            .update_share(c.id, Uuid::new_v4(), caller_id, UpdateShareRequest { role: ShareRole::Editor })
+            .update_share(
+                c.id,
+                Uuid::new_v4(),
+                caller_id,
+                UpdateShareRequest {
+                    role: ShareRole::Editor,
+                },
+            )
             .await
             .unwrap_err();
         assert!(matches!(err, DomainError::CollectionShareNotFound(_)));
@@ -877,7 +996,10 @@ mod tests {
         let share = CollectionShare::new_user(c.id, Uuid::new_v4(), ShareRole::Viewer);
         let share_id = share.id;
         let (service, caller_id) = svc(owner, vec![c.clone()], vec![share]);
-        service.remove_share(c.id, share_id, caller_id).await.unwrap();
+        service
+            .remove_share(c.id, share_id, caller_id)
+            .await
+            .unwrap();
         let remaining = service.list_shares(c.id, caller_id).await.unwrap();
         assert!(remaining.is_empty());
     }
@@ -895,7 +1017,10 @@ mod tests {
             Arc::new(FakeCollectionShareRepo::with(vec![share])),
             Arc::new(FakeUserRepo::with(vec![owner, stranger])),
         );
-        let err = service.remove_share(c.id, share_id, stranger_id).await.unwrap_err();
+        let err = service
+            .remove_share(c.id, share_id, stranger_id)
+            .await
+            .unwrap_err();
         assert!(matches!(err, DomainError::Forbidden));
     }
 
@@ -905,7 +1030,10 @@ mod tests {
         let owner_id = owner.id;
         let c = make_collection("C", owner_id);
         let (service, caller_id) = svc(owner, vec![c.clone()], vec![]);
-        let err = service.remove_share(c.id, Uuid::new_v4(), caller_id).await.unwrap_err();
+        let err = service
+            .remove_share(c.id, Uuid::new_v4(), caller_id)
+            .await
+            .unwrap_err();
         assert!(matches!(err, DomainError::CollectionShareNotFound(_)));
     }
 
@@ -957,7 +1085,13 @@ mod tests {
         let c = make_collection("C", owner_id);
         let (service, caller_id) = svc(owner, vec![c.clone()], vec![]);
         let err = service
-            .transfer_ownership(c.id, caller_id, TransferOwnershipRequest { new_owner_id: Uuid::new_v4() })
+            .transfer_ownership(
+                c.id,
+                caller_id,
+                TransferOwnershipRequest {
+                    new_owner_id: Uuid::new_v4(),
+                },
+            )
             .await
             .unwrap_err();
         assert!(matches!(err, DomainError::UserNotFound(_)));
@@ -975,7 +1109,11 @@ mod tests {
             Arc::new(FakeUserRepo::with(vec![owner, new_owner])),
         );
         let err = service
-            .transfer_ownership(Uuid::new_v4(), owner_id, TransferOwnershipRequest { new_owner_id })
+            .transfer_ownership(
+                Uuid::new_v4(),
+                owner_id,
+                TransferOwnershipRequest { new_owner_id },
+            )
             .await
             .unwrap_err();
         assert!(matches!(err, DomainError::CollectionNotFound(_)));

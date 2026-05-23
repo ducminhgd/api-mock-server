@@ -126,7 +126,12 @@ mod tests {
 
     #[test]
     fn new_sets_active_status_and_private_visibility_by_default() {
-        let c = Collection::new("My API".into(), None, owner(), CollectionVisibility::Private);
+        let c = Collection::new(
+            "My API".into(),
+            None,
+            owner(),
+            CollectionVisibility::Private,
+        );
         assert_eq!(c.status, CollectionStatus::Active);
         assert_eq!(c.visibility, CollectionVisibility::Private);
         assert!(c.description.is_none());
@@ -148,7 +153,12 @@ mod tests {
 
     #[test]
     fn new_stores_description() {
-        let c = Collection::new("C".into(), Some("desc".into()), owner(), CollectionVisibility::Private);
+        let c = Collection::new(
+            "C".into(),
+            Some("desc".into()),
+            owner(),
+            CollectionVisibility::Private,
+        );
         assert_eq!(c.description.as_deref(), Some("desc"));
     }
 
@@ -166,7 +176,12 @@ mod tests {
 
     #[test]
     fn apply_update_clears_description_with_some_none() {
-        let mut c = Collection::new("C".into(), Some("desc".into()), owner(), CollectionVisibility::Private);
+        let mut c = Collection::new(
+            "C".into(),
+            Some("desc".into()),
+            owner(),
+            CollectionVisibility::Private,
+        );
         c.apply_update(None, Some(None), None, None);
         assert!(c.description.is_none());
     }
@@ -195,7 +210,12 @@ mod tests {
     #[test]
     fn apply_update_none_args_leave_fields_unchanged() {
         let oid = owner();
-        let mut c = Collection::new("C".into(), Some("d".into()), oid, CollectionVisibility::Public);
+        let mut c = Collection::new(
+            "C".into(),
+            Some("d".into()),
+            oid,
+            CollectionVisibility::Public,
+        );
         c.apply_update(None, None, None, None);
         assert_eq!(c.name, "C");
         assert_eq!(c.description.as_deref(), Some("d"));
@@ -208,7 +228,12 @@ mod tests {
     fn transfer_ownership_changes_owner_and_updates_timestamp() {
         let original_owner = owner();
         let new_owner = owner();
-        let mut c = Collection::new("C".into(), None, original_owner, CollectionVisibility::Private);
+        let mut c = Collection::new(
+            "C".into(),
+            None,
+            original_owner,
+            CollectionVisibility::Private,
+        );
         let before = c.updated_at;
         c.transfer_ownership(new_owner);
         assert_eq!(c.owner_id, new_owner);

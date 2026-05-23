@@ -81,7 +81,14 @@ mod tests {
 
     #[test]
     fn clamped_limit_caps_at_100() {
-        assert_eq!(PageParams { page: 1, limit: 200 }.clamped_limit(), 100);
+        assert_eq!(
+            PageParams {
+                page: 1,
+                limit: 200
+            }
+            .clamped_limit(),
+            100
+        );
     }
 
     #[test]
@@ -96,7 +103,10 @@ mod tests {
 
     #[test]
     fn paginated_new_clamps_limit_in_meta() {
-        let params = PageParams { page: 1, limit: 500 };
+        let params = PageParams {
+            page: 1,
+            limit: 500,
+        };
         let p: Paginated<()> = Paginated::new(vec![], 0, &params);
         assert_eq!(p.meta.limit, 100);
     }

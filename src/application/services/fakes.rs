@@ -30,7 +30,9 @@ pub struct FakeCollectionRepo {
 
 impl FakeCollectionRepo {
     pub fn empty() -> Self {
-        Self { store: Mutex::new(HashMap::new()) }
+        Self {
+            store: Mutex::new(HashMap::new()),
+        }
     }
 
     pub fn with(collections: Vec<Collection>) -> Self {
@@ -95,7 +97,10 @@ impl CollectionRepository for FakeCollectionRepo {
     }
 
     async fn save(&self, collection: &Collection) -> Result<(), DomainError> {
-        self.store.lock().unwrap().insert(collection.id, collection.clone());
+        self.store
+            .lock()
+            .unwrap()
+            .insert(collection.id, collection.clone());
         Ok(())
     }
 
@@ -113,7 +118,9 @@ pub struct FakeCollectionShareRepo {
 
 impl FakeCollectionShareRepo {
     pub fn empty() -> Self {
-        Self { store: Mutex::new(HashMap::new()) }
+        Self {
+            store: Mutex::new(HashMap::new()),
+        }
     }
 
     pub fn with(shares: Vec<CollectionShare>) -> Self {
@@ -125,7 +132,10 @@ impl FakeCollectionShareRepo {
 
 #[async_trait]
 impl CollectionShareRepository for FakeCollectionShareRepo {
-    async fn find_by_collection(&self, collection_id: Uuid) -> Result<Vec<CollectionShare>, DomainError> {
+    async fn find_by_collection(
+        &self,
+        collection_id: Uuid,
+    ) -> Result<Vec<CollectionShare>, DomainError> {
         Ok(self
             .store
             .lock()
@@ -157,9 +167,7 @@ impl CollectionShareRepository for FakeCollectionShareRepo {
             .unwrap()
             .values()
             .find(|s| {
-                s.collection_id == collection_id
-                    && s.user_id == user_id
-                    && s.group_id == group_id
+                s.collection_id == collection_id && s.user_id == user_id && s.group_id == group_id
             })
             .cloned())
     }
@@ -175,7 +183,10 @@ impl CollectionShareRepository for FakeCollectionShareRepo {
     }
 
     async fn delete_by_collection(&self, collection_id: Uuid) -> Result<(), DomainError> {
-        self.store.lock().unwrap().retain(|_, s| s.collection_id != collection_id);
+        self.store
+            .lock()
+            .unwrap()
+            .retain(|_, s| s.collection_id != collection_id);
         Ok(())
     }
 }
@@ -188,7 +199,9 @@ pub struct FakeGroupRepo {
 
 impl FakeGroupRepo {
     pub fn empty() -> Self {
-        Self { store: Mutex::new(HashMap::new()) }
+        Self {
+            store: Mutex::new(HashMap::new()),
+        }
     }
 
     pub fn with(groups: Vec<Group>) -> Self {
@@ -243,7 +256,13 @@ impl GroupRepository for FakeGroupRepo {
     }
 
     async fn find_by_name(&self, name: &str) -> Result<Option<Group>, DomainError> {
-        Ok(self.store.lock().unwrap().values().find(|g| g.name == name).cloned())
+        Ok(self
+            .store
+            .lock()
+            .unwrap()
+            .values()
+            .find(|g| g.name == name)
+            .cloned())
     }
 
     async fn save(&self, group: &Group) -> Result<(), DomainError> {
@@ -265,7 +284,9 @@ pub struct FakeUserRepo {
 
 impl FakeUserRepo {
     pub fn empty() -> Self {
-        Self { store: Mutex::new(HashMap::new()) }
+        Self {
+            store: Mutex::new(HashMap::new()),
+        }
     }
 
     pub fn with(users: Vec<User>) -> Self {
@@ -325,7 +346,13 @@ impl UserRepository for FakeUserRepo {
     }
 
     async fn find_by_username(&self, username: &str) -> Result<Option<User>, DomainError> {
-        Ok(self.store.lock().unwrap().values().find(|u| u.username == username).cloned())
+        Ok(self
+            .store
+            .lock()
+            .unwrap()
+            .values()
+            .find(|u| u.username == username)
+            .cloned())
     }
 
     async fn save(&self, user: &User) -> Result<(), DomainError> {

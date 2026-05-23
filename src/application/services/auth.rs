@@ -21,7 +21,11 @@ impl AuthService {
         hasher: Arc<dyn PasswordHasher>,
         issuer: Arc<dyn TokenIssuer>,
     ) -> Self {
-        Self { user_repo, hasher, issuer }
+        Self {
+            user_repo,
+            hasher,
+            issuer,
+        }
     }
 
     pub async fn login(&self, req: LoginRequest) -> Result<LoginResponse, DomainError> {
@@ -36,7 +40,9 @@ impl AuthService {
             return Err(DomainError::InvalidCredentials);
         }
 
-        let token = self.issuer.issue(&user.id.to_string(), &user.role.to_string())?;
+        let token = self
+            .issuer
+            .issue(&user.id.to_string(), &user.role.to_string())?;
         Ok(LoginResponse {
             token,
             user: UserResponse::from(user),
@@ -54,7 +60,12 @@ mod tests {
     use crate::domain::user::{User, UserRole};
 
     fn make_user(username: &str, password: &str) -> User {
-        User::new(username.into(), format!("hashed:{password}"), None, UserRole::Regular)
+        User::new(
+            username.into(),
+            format!("hashed:{password}"),
+            None,
+            UserRole::Regular,
+        )
     }
 
     fn svc(users: Vec<User>) -> AuthService {
@@ -68,7 +79,13 @@ mod tests {
     #[tokio::test]
     async fn login_returns_token_for_valid_credentials() {
         let u = make_user("alice", "secret");
-        let resp = svc(vec![u]).login(LoginRequest { username: "alice".into(), password: "secret".into() }).await.unwrap();
+        let resp = svc(vec![u])
+            .login(LoginRequest {
+                username: "alice".into(),
+                password: "secret".into(),
+            })
+            .await
+            .unwrap();
         assert!(resp.token.starts_with("token:"));
         assert_eq!(resp.user.username, "alice");
     }
@@ -77,14 +94,23 @@ mod tests {
     async fn login_token_contains_user_id_and_role() {
         let u = make_user("carol", "pass");
         let uid = u.id.to_string();
-        let resp = svc(vec![u]).login(LoginRequest { username: "carol".into(), password: "pass".into() }).await.unwrap();
+        let resp = svc(vec![u])
+            .login(LoginRequest {
+                username: "carol".into(),
+                password: "pass".into(),
+            })
+            .await
+            .unwrap();
         assert_eq!(resp.token, format!("token:{uid}:regular"));
     }
 
     #[tokio::test]
     async fn login_fails_for_unknown_username() {
         let err = svc(vec![])
-            .login(LoginRequest { username: "nobody".into(), password: "pass".into() })
+            .login(LoginRequest {
+                username: "nobody".into(),
+                password: "pass".into(),
+            })
             .await
             .unwrap_err();
         assert!(matches!(err, DomainError::InvalidCredentials));
@@ -94,7 +120,10 @@ mod tests {
     async fn login_fails_for_wrong_password() {
         let u = make_user("bob", "correct");
         let err = svc(vec![u])
-            .login(LoginRequest { username: "bob".into(), password: "wrong".into() })
+            .login(LoginRequest {
+                username: "bob".into(),
+                password: "wrong".into(),
+            })
             .await
             .unwrap_err();
         assert!(matches!(err, DomainError::InvalidCredentials));

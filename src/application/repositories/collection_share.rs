@@ -6,7 +6,10 @@ use crate::domain::errors::DomainError;
 
 #[async_trait]
 pub trait CollectionShareRepository: Send + Sync {
-    async fn find_by_collection(&self, collection_id: Uuid) -> Result<Vec<CollectionShare>, DomainError>;
+    async fn find_by_collection(
+        &self,
+        collection_id: Uuid,
+    ) -> Result<Vec<CollectionShare>, DomainError>;
 
     async fn find_by_id(&self, id: Uuid) -> Result<CollectionShare, DomainError>;
 

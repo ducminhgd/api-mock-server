@@ -7,7 +7,10 @@ use crate::application::services::auth::TokenIssuer;
 use crate::domain::errors::DomainError;
 
 fn current_timestamp() -> u64 {
-    SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs()
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs()
 }
 
 const TOKEN_TTL_SECS: u64 = 86_400; // 24 h
@@ -42,7 +45,11 @@ impl JwtIssuer {
 impl TokenIssuer for JwtIssuer {
     fn issue(&self, user_id: &str, role: &str) -> Result<String, DomainError> {
         let exp = current_timestamp() + TOKEN_TTL_SECS;
-        let claims = Claims { sub: user_id.to_owned(), role: role.to_owned(), exp };
+        let claims = Claims {
+            sub: user_id.to_owned(),
+            role: role.to_owned(),
+            exp,
+        };
         encode(&Header::default(), &claims, &self.encoding)
             .map_err(|e| DomainError::Internal(e.to_string()))
     }
