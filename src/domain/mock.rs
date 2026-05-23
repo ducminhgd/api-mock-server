@@ -85,7 +85,17 @@ mod tests {
     use crate::domain::endpoint::{Endpoint, HttpMethod};
 
     fn ep(method: HttpMethod, path: &str) -> Endpoint {
-        Endpoint::new(Uuid::new_v4(), "test".into(), method, path.into(), 200, 0, None, None, None)
+        Endpoint::new(
+            Uuid::new_v4(),
+            "test".into(),
+            method,
+            path.into(),
+            200,
+            0,
+            None,
+            None,
+            None,
+        )
     }
 
     // ── match_path ────────────────────────────────────────────────────────────

@@ -93,12 +93,7 @@ mod tests {
     use crate::domain::endpoint::{Endpoint, EndpointStatus, HttpMethod};
 
     fn make_collection(owner_id: Uuid) -> Collection {
-        Collection::new(
-            "C".into(),
-            None,
-            owner_id,
-            CollectionVisibility::Public,
-        )
+        Collection::new("C".into(), None, owner_id, CollectionVisibility::Public)
     }
 
     fn make_endpoint(collection_id: Uuid, method: HttpMethod, path: &str) -> Endpoint {
@@ -235,7 +230,10 @@ mod tests {
         ep.response_body = Some("pong".into());
         ep.delay_ms = 50;
         let service = svc(vec![c.clone()], vec![ep]);
-        let result = service.resolve(c.id, HttpMethod::Get, "/ping").await.unwrap();
+        let result = service
+            .resolve(c.id, HttpMethod::Get, "/ping")
+            .await
+            .unwrap();
         assert_eq!(result.status_code, 204);
         assert_eq!(result.response_body.as_deref(), Some("pong"));
         assert_eq!(result.delay_ms, 50);

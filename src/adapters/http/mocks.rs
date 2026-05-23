@@ -48,12 +48,7 @@ async fn handle_with_tail(
     dispatch(method, state, collection_id, &path).await
 }
 
-async fn dispatch(
-    method: Method,
-    state: AppState,
-    collection_id: Uuid,
-    path: &str,
-) -> Response {
+async fn dispatch(method: Method, state: AppState, collection_id: Uuid, path: &str) -> Response {
     let domain_method = match to_domain_method(&method) {
         Some(m) => m,
         None => {
@@ -61,16 +56,18 @@ async fn dispatch(
         }
     };
 
-    match state.mocks.resolve(collection_id, domain_method, path).await {
+    match state
+        .mocks
+        .resolve(collection_id, domain_method, path)
+        .await
+    {
         Err(MockError::CollectionNotFound) => {
             (StatusCode::NOT_FOUND, "collection not found").into_response()
         }
         Err(MockError::ServiceUnavailable) => {
             (StatusCode::SERVICE_UNAVAILABLE, "collection is inactive").into_response()
         }
-        Err(MockError::NotFound) => {
-            (StatusCode::NOT_FOUND, "no matching endpoint").into_response()
-        }
+        Err(MockError::NotFound) => (StatusCode::NOT_FOUND, "no matching endpoint").into_response(),
         Err(MockError::MethodNotAllowed(allowed)) => {
             let allow_value = allowed
                 .iter()
@@ -83,24 +80,19 @@ async fn dispatch(
                 .body(Body::from("method not allowed"))
                 .unwrap_or_else(|_| StatusCode::METHOD_NOT_ALLOWED.into_response())
         }
-        Err(MockError::Internal(_)) => {
-            StatusCode::INTERNAL_SERVER_ERROR.into_response()
-        }
+        Err(MockError::Internal(_)) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
         Ok(result) => {
             if result.delay_ms > 0 {
                 tokio::time::sleep(Duration::from_millis(result.delay_ms as u64)).await;
             }
 
-            let status =
-                StatusCode::from_u16(result.status_code).unwrap_or(StatusCode::OK);
+            let status = StatusCode::from_u16(result.status_code).unwrap_or(StatusCode::OK);
 
             let mut builder = Response::builder().status(status);
 
             // Apply custom response headers from the JSON string.
             if let Some(ref headers_json) = result.response_headers {
-                if let Ok(map) =
-                    serde_json::from_str::<HashMap<String, String>>(headers_json)
-                {
+                if let Ok(map) = serde_json::from_str::<HashMap<String, String>>(headers_json) {
                     for (k, v) in map {
                         if let (Ok(name), Ok(value)) = (
                             HeaderName::from_bytes(k.as_bytes()),

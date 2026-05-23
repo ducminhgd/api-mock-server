@@ -8,6 +8,7 @@ async fn main() {
     use api_mock_server::application::services::collections::CollectionService;
     use api_mock_server::application::services::endpoints::EndpointService;
     use api_mock_server::application::services::groups::GroupService;
+    use api_mock_server::application::services::import_export::ImportExportService;
     use api_mock_server::application::services::mocks::MockService;
     use api_mock_server::application::services::users::UserService;
     use api_mock_server::infrastructure::auth::jwt::JwtIssuer;
@@ -59,6 +60,11 @@ async fn main() {
             collection_repo.clone(),
             collection_share_repo.clone(),
             user_repo.clone(),
+        )),
+        import_export: Arc::new(ImportExportService::new(
+            collection_repo.clone(),
+            endpoint_repo.clone(),
+            collection_share_repo.clone(),
         )),
         mocks: Arc::new(MockService::new(collection_repo, endpoint_repo)),
         groups: Arc::new(GroupService::new(group_repo)),
