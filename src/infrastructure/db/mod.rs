@@ -1,5 +1,6 @@
 pub mod collection_shares;
 pub mod collections;
+pub mod endpoints;
 pub mod groups;
 pub mod users;
 

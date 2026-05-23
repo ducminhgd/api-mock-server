@@ -11,6 +11,8 @@ pub enum DomainError {
     CollectionNotFound(Uuid),
     #[error("collection share not found: {0}")]
     CollectionShareNotFound(Uuid),
+    #[error("endpoint not found: {0}")]
+    EndpointNotFound(Uuid),
     #[error("username already taken: {0}")]
     UsernameTaken(String),
     #[error("group name already taken: {0}")]

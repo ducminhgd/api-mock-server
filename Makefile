@@ -15,3 +15,5 @@ migrate:
 lint:
 	cargo clippy --fix --allow-dirty
 	cargo fmt --all
+
+pre-commit: lint test build

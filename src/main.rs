@@ -6,6 +6,7 @@ async fn main() {
     use api_mock_server::adapters::http as http_adapters;
     use api_mock_server::application::services::auth::AuthService;
     use api_mock_server::application::services::collections::CollectionService;
+    use api_mock_server::application::services::endpoints::EndpointService;
     use api_mock_server::application::services::groups::GroupService;
     use api_mock_server::application::services::users::UserService;
     use api_mock_server::infrastructure::auth::jwt::JwtIssuer;
@@ -14,6 +15,7 @@ async fn main() {
     use api_mock_server::infrastructure::db;
     use api_mock_server::infrastructure::db::collection_shares::SqlxCollectionShareRepository;
     use api_mock_server::infrastructure::db::collections::SqlxCollectionRepository;
+    use api_mock_server::infrastructure::db::endpoints::SqlxEndpointRepository;
     use api_mock_server::infrastructure::db::groups::SqlxGroupRepository;
     use api_mock_server::infrastructure::db::users::SqlxUserRepository;
     use api_mock_server::infrastructure::state::AppState;
@@ -37,6 +39,7 @@ async fn main() {
     let user_repo = Arc::new(SqlxUserRepository::new(pool.clone()));
     let collection_repo = Arc::new(SqlxCollectionRepository::new(pool.clone()));
     let collection_share_repo = Arc::new(SqlxCollectionShareRepository::new(pool.clone()));
+    let endpoint_repo = Arc::new(SqlxEndpointRepository::new(pool.clone()));
 
     let conf = get_configuration(None).expect("failed to load Leptos configuration");
     let leptos_options = conf.leptos_options;
@@ -45,6 +48,13 @@ async fn main() {
 
     let app_state = AppState {
         collections: Arc::new(CollectionService::new(
+            collection_repo.clone(),
+            collection_share_repo.clone(),
+            endpoint_repo.clone(),
+            user_repo.clone(),
+        )),
+        endpoints: Arc::new(EndpointService::new(
+            endpoint_repo,
             collection_repo,
             collection_share_repo,
             user_repo.clone(),

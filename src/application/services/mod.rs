@@ -1,5 +1,6 @@
 pub mod auth;
 pub mod collections;
+pub mod endpoints;
 pub mod groups;
 pub mod users;
 
