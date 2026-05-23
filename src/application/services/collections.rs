@@ -396,7 +396,6 @@ mod tests {
         let viewer = make_user("bob");
         let viewer_id = viewer.id;
         let c = make_collection("Shared Collection", owner.id);
-        let share = CollectionShare::new_user(c.id, viewer_id, ShareRole::Viewer);
         // Build a fresh service with both users seeded so user lookup works for both owner and viewer.
         let service = CollectionService::new(
             Arc::new(FakeCollectionRepo::with(vec![c.clone()])),
