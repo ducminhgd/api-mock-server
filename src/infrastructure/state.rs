@@ -7,6 +7,7 @@ use crate::application::services::auth::AuthService;
 use crate::application::services::collections::CollectionService;
 use crate::application::services::endpoints::EndpointService;
 use crate::application::services::groups::GroupService;
+use crate::application::services::mocks::MockService;
 use crate::application::services::users::UserService;
 use crate::infrastructure::auth::jwt::JwtIssuer;
 
@@ -15,6 +16,7 @@ pub struct AppState {
     pub collections: Arc<CollectionService>,
     pub endpoints: Arc<EndpointService>,
     pub groups: Arc<GroupService>,
+    pub mocks: Arc<MockService>,
     pub users: Arc<UserService>,
     pub auth: Arc<AuthService>,
     pub jwt: Arc<JwtIssuer>,

@@ -5,4 +5,5 @@ pub mod collection_share;
 pub mod endpoint;
 pub mod errors;
 pub mod group;
+pub mod mock;
 pub mod user;

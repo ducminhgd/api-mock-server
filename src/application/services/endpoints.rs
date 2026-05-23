@@ -209,7 +209,7 @@ mod tests {
     };
     use crate::domain::collection::{Collection, CollectionVisibility};
     use crate::domain::collection_share::{CollectionShare, ShareRole};
-    use crate::domain::endpoint::{Endpoint, EndpointStatus, HttpMethod};
+    use crate::domain::endpoint::{Endpoint, HttpMethod};
     use crate::domain::errors::DomainError;
     use crate::domain::user::{User, UserRole};
 
