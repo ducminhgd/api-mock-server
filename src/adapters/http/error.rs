@@ -11,7 +11,7 @@ struct ErrorBody {
     message: String,
 }
 
-pub struct ApiError(StatusCode, &'static str, String);
+pub struct ApiError(pub StatusCode, pub &'static str, pub String);
 
 impl IntoResponse for ApiError {
     fn into_response(self) -> Response {
@@ -23,10 +23,15 @@ impl IntoResponse for ApiError {
 impl From<DomainError> for ApiError {
     fn from(e: DomainError) -> Self {
         match &e {
-            DomainError::GroupNotFound(_) | DomainError::UserNotFound(_) => {
+            DomainError::GroupNotFound(_)
+            | DomainError::UserNotFound(_)
+            | DomainError::CollectionNotFound(_)
+            | DomainError::CollectionShareNotFound(_) => {
                 ApiError(StatusCode::NOT_FOUND, "NOT_FOUND", e.to_string())
             }
-            DomainError::UsernameTaken(_) | DomainError::GroupNameTaken(_) => {
+            DomainError::UsernameTaken(_)
+            | DomainError::GroupNameTaken(_)
+            | DomainError::Conflict(_) => {
                 ApiError(StatusCode::CONFLICT, "CONFLICT", e.to_string())
             }
             DomainError::InvalidCredentials => {
@@ -34,6 +39,9 @@ impl From<DomainError> for ApiError {
             }
             DomainError::Forbidden => {
                 ApiError(StatusCode::FORBIDDEN, "FORBIDDEN", e.to_string())
+            }
+            DomainError::InvalidInput(_) => {
+                ApiError(StatusCode::UNPROCESSABLE_ENTITY, "VALIDATION_ERROR", e.to_string())
             }
             DomainError::Internal(_) => {
                 ApiError(StatusCode::INTERNAL_SERVER_ERROR, "INTERNAL_ERROR", "internal server error".into())
