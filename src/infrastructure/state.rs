@@ -4,12 +4,14 @@ use axum::extract::FromRef;
 use leptos::config::LeptosOptions;
 
 use crate::application::services::auth::AuthService;
+use crate::application::services::collections::CollectionService;
 use crate::application::services::groups::GroupService;
 use crate::application::services::users::UserService;
 use crate::infrastructure::auth::jwt::JwtIssuer;
 
 #[derive(Clone)]
 pub struct AppState {
+    pub collections: Arc<CollectionService>,
     pub groups: Arc<GroupService>,
     pub users: Arc<UserService>,
     pub auth: Arc<AuthService>,

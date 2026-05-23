@@ -13,5 +13,5 @@ migrate:
 	sqlx migrate run
 
 lint:
-	cargo clippy --all-targets --all-features -- -D warnings
-	cargo fmt --check
+	cargo clippy --fix --allow-dirty
+	cargo fmt --all

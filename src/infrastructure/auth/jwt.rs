@@ -1,8 +1,17 @@
+use std::time::{SystemTime, UNIX_EPOCH};
+
 use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
 use serde::{Deserialize, Serialize};
 
 use crate::application::services::auth::TokenIssuer;
 use crate::domain::errors::DomainError;
+
+fn current_timestamp() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs()
+}
 
 const TOKEN_TTL_SECS: u64 = 86_400; // 24 h
 
@@ -35,8 +44,12 @@ impl JwtIssuer {
 
 impl TokenIssuer for JwtIssuer {
     fn issue(&self, user_id: &str, role: &str) -> Result<String, DomainError> {
-        let exp = jsonwebtoken::get_current_timestamp() + TOKEN_TTL_SECS;
-        let claims = Claims { sub: user_id.to_owned(), role: role.to_owned(), exp };
+        let exp = current_timestamp() + TOKEN_TTL_SECS;
+        let claims = Claims {
+            sub: user_id.to_owned(),
+            role: role.to_owned(),
+            exp,
+        };
         encode(&Header::default(), &claims, &self.encoding)
             .map_err(|e| DomainError::Internal(e.to_string()))
     }
@@ -62,7 +75,7 @@ mod tests {
         let issuer = JwtIssuer::new(SECRET);
         let token = issuer.issue("u", "r").unwrap();
         let claims = issuer.verify(&token).unwrap();
-        let now = jsonwebtoken::get_current_timestamp();
+        let now = current_timestamp();
         let diff = claims.exp.saturating_sub(now);
         assert!(diff > TOKEN_TTL_SECS - 5 && diff <= TOKEN_TTL_SECS);
     }

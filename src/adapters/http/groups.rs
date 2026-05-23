@@ -31,9 +31,20 @@ async fn list(
     State(state): State<AppState>,
     Query(q): Query<ListQuery>,
 ) -> Result<Json<Paginated<GroupResponse>>, ApiError> {
-    let filter = GroupFilter { search: q.search, status: q.status };
-    let page = PageParams { page: q.page.unwrap_or(1), limit: q.limit.unwrap_or(20) };
-    state.groups.list(filter, page).await.map(Json).map_err(ApiError::from)
+    let filter = GroupFilter {
+        search: q.search,
+        status: q.status,
+    };
+    let page = PageParams {
+        page: q.page.unwrap_or(1),
+        limit: q.limit.unwrap_or(20),
+    };
+    state
+        .groups
+        .list(filter, page)
+        .await
+        .map(Json)
+        .map_err(ApiError::from)
 }
 
 async fn create(
@@ -56,7 +67,12 @@ async fn update(
     Path(id): Path<Uuid>,
     Json(req): Json<UpdateGroupRequest>,
 ) -> Result<Json<GroupResponse>, ApiError> {
-    state.groups.update(id, req).await.map(Json).map_err(ApiError::from)
+    state
+        .groups
+        .update(id, req)
+        .await
+        .map(Json)
+        .map_err(ApiError::from)
 }
 
 async fn remove(

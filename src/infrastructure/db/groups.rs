@@ -25,23 +25,36 @@ fn parse_dt(s: &str) -> Result<DateTime<Utc>, DomainError> {
         .map(|d| d.with_timezone(&Utc))
         .or_else(|_| {
             // SQLite stores as "YYYY-MM-DD HH:MM:SS" when inserted via CURRENT_TIMESTAMP
-            chrono::NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M:%S")
-                .map(|d| d.and_utc())
+            chrono::NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M:%S").map(|d| d.and_utc())
         })
         .map_err(|e| DomainError::Internal(format!("invalid timestamp '{s}': {e}")))
 }
 
 fn row_to_group(row: &sqlx::any::AnyRow) -> Result<Group, DomainError> {
-    let id_str: String = row.try_get("id").map_err(|e| DomainError::Internal(e.to_string()))?;
+    let id_str: String = row
+        .try_get("id")
+        .map_err(|e| DomainError::Internal(e.to_string()))?;
     let id = Uuid::parse_str(&id_str).map_err(|e| DomainError::Internal(e.to_string()))?;
-    let status_str: String = row.try_get("status").map_err(|e| DomainError::Internal(e.to_string()))?;
-    let status = status_str.parse::<GroupStatus>().map_err(DomainError::Internal)?;
-    let created_at_str: String = row.try_get("created_at").map_err(|e| DomainError::Internal(e.to_string()))?;
-    let updated_at_str: String = row.try_get("updated_at").map_err(|e| DomainError::Internal(e.to_string()))?;
+    let status_str: String = row
+        .try_get("status")
+        .map_err(|e| DomainError::Internal(e.to_string()))?;
+    let status = status_str
+        .parse::<GroupStatus>()
+        .map_err(DomainError::Internal)?;
+    let created_at_str: String = row
+        .try_get("created_at")
+        .map_err(|e| DomainError::Internal(e.to_string()))?;
+    let updated_at_str: String = row
+        .try_get("updated_at")
+        .map_err(|e| DomainError::Internal(e.to_string()))?;
     Ok(Group {
         id,
-        name: row.try_get("name").map_err(|e| DomainError::Internal(e.to_string()))?,
-        description: row.try_get("description").map_err(|e| DomainError::Internal(e.to_string()))?,
+        name: row
+            .try_get("name")
+            .map_err(|e| DomainError::Internal(e.to_string()))?,
+        description: row
+            .try_get("description")
+            .map_err(|e| DomainError::Internal(e.to_string()))?,
         status,
         created_at: parse_dt(&created_at_str)?,
         updated_at: parse_dt(&updated_at_str)?,
@@ -86,7 +99,10 @@ impl GroupRepository for SqlxGroupRepository {
         .await
         .map_err(|e| DomainError::Internal(e.to_string()))?;
 
-        let groups = rows.iter().map(row_to_group).collect::<Result<Vec<_>, _>>()?;
+        let groups = rows
+            .iter()
+            .map(row_to_group)
+            .collect::<Result<Vec<_>, _>>()?;
         Ok((groups, total as u64))
     }
 

@@ -4,16 +4,192 @@ use std::sync::Mutex;
 use async_trait::async_trait;
 use uuid::Uuid;
 
+use crate::application::dto::collection::CollectionFilter;
 use crate::application::dto::group::GroupFilter;
 use crate::application::dto::pagination::PageParams;
 use crate::application::dto::user::UserFilter;
+use crate::application::repositories::collection::CollectionRepository;
+use crate::application::repositories::collection_share::CollectionShareRepository;
 use crate::application::repositories::group::GroupRepository;
 use crate::application::repositories::user::UserRepository;
 use crate::application::services::auth::TokenIssuer;
 use crate::application::services::users::PasswordHasher;
+use crate::domain::collection::Collection;
+use crate::domain::collection_share::CollectionShare;
 use crate::domain::errors::DomainError;
 use crate::domain::group::Group;
 use crate::domain::user::User;
+
+// ── FakeCollectionRepository ──────────────────────────────────────────────────
+// Note: find_all only filters by owner_id (not shares). The SQL impl does the full
+// access-scoped join. Shares-based visibility is covered by integration tests.
+
+pub struct FakeCollectionRepo {
+    store: Mutex<HashMap<Uuid, Collection>>,
+}
+
+impl FakeCollectionRepo {
+    pub fn empty() -> Self {
+        Self {
+            store: Mutex::new(HashMap::new()),
+        }
+    }
+
+    pub fn with(collections: Vec<Collection>) -> Self {
+        Self {
+            store: Mutex::new(collections.into_iter().map(|c| (c.id, c)).collect()),
+        }
+    }
+}
+
+#[async_trait]
+impl CollectionRepository for FakeCollectionRepo {
+    async fn find_all(
+        &self,
+        caller_id: Uuid,
+        _caller_group_id: Option<Uuid>,
+        filter: &CollectionFilter,
+        page: &PageParams,
+    ) -> Result<(Vec<Collection>, u64), DomainError> {
+        let store = self.store.lock().unwrap();
+        let mut items: Vec<Collection> = store
+            .values()
+            .filter(|c| {
+                if c.owner_id != caller_id {
+                    return false;
+                }
+                if let Some(ref s) = filter.search {
+                    if !c.name.contains(s.as_str()) {
+                        return false;
+                    }
+                }
+                if let Some(ref st) = filter.status {
+                    if &c.status != st {
+                        return false;
+                    }
+                }
+                if let Some(ref v) = filter.visibility {
+                    if &c.visibility != v {
+                        return false;
+                    }
+                }
+                true
+            })
+            .cloned()
+            .collect();
+        items.sort_by(|a, b| a.name.cmp(&b.name));
+        let total = items.len() as u64;
+        let data = items
+            .into_iter()
+            .skip(page.offset() as usize)
+            .take(page.clamped_limit() as usize)
+            .collect();
+        Ok((data, total))
+    }
+
+    async fn find_by_id(&self, id: Uuid) -> Result<Collection, DomainError> {
+        self.store
+            .lock()
+            .unwrap()
+            .get(&id)
+            .cloned()
+            .ok_or(DomainError::CollectionNotFound(id))
+    }
+
+    async fn save(&self, collection: &Collection) -> Result<(), DomainError> {
+        self.store
+            .lock()
+            .unwrap()
+            .insert(collection.id, collection.clone());
+        Ok(())
+    }
+
+    async fn delete(&self, id: Uuid) -> Result<(), DomainError> {
+        self.store.lock().unwrap().remove(&id);
+        Ok(())
+    }
+}
+
+// ── FakeCollectionShareRepository ─────────────────────────────────────────────
+
+pub struct FakeCollectionShareRepo {
+    store: Mutex<HashMap<Uuid, CollectionShare>>,
+}
+
+impl FakeCollectionShareRepo {
+    pub fn empty() -> Self {
+        Self {
+            store: Mutex::new(HashMap::new()),
+        }
+    }
+
+    pub fn with(shares: Vec<CollectionShare>) -> Self {
+        Self {
+            store: Mutex::new(shares.into_iter().map(|s| (s.id, s)).collect()),
+        }
+    }
+}
+
+#[async_trait]
+impl CollectionShareRepository for FakeCollectionShareRepo {
+    async fn find_by_collection(
+        &self,
+        collection_id: Uuid,
+    ) -> Result<Vec<CollectionShare>, DomainError> {
+        Ok(self
+            .store
+            .lock()
+            .unwrap()
+            .values()
+            .filter(|s| s.collection_id == collection_id)
+            .cloned()
+            .collect())
+    }
+
+    async fn find_by_id(&self, id: Uuid) -> Result<CollectionShare, DomainError> {
+        self.store
+            .lock()
+            .unwrap()
+            .get(&id)
+            .cloned()
+            .ok_or(DomainError::CollectionShareNotFound(id))
+    }
+
+    async fn find_existing(
+        &self,
+        collection_id: Uuid,
+        user_id: Option<Uuid>,
+        group_id: Option<Uuid>,
+    ) -> Result<Option<CollectionShare>, DomainError> {
+        Ok(self
+            .store
+            .lock()
+            .unwrap()
+            .values()
+            .find(|s| {
+                s.collection_id == collection_id && s.user_id == user_id && s.group_id == group_id
+            })
+            .cloned())
+    }
+
+    async fn save(&self, share: &CollectionShare) -> Result<(), DomainError> {
+        self.store.lock().unwrap().insert(share.id, share.clone());
+        Ok(())
+    }
+
+    async fn delete(&self, id: Uuid) -> Result<(), DomainError> {
+        self.store.lock().unwrap().remove(&id);
+        Ok(())
+    }
+
+    async fn delete_by_collection(&self, collection_id: Uuid) -> Result<(), DomainError> {
+        self.store
+            .lock()
+            .unwrap()
+            .retain(|_, s| s.collection_id != collection_id);
+        Ok(())
+    }
+}
 
 // ── FakeGroupRepository ───────────────────────────────────────────────────────
 
@@ -23,7 +199,9 @@ pub struct FakeGroupRepo {
 
 impl FakeGroupRepo {
     pub fn empty() -> Self {
-        Self { store: Mutex::new(HashMap::new()) }
+        Self {
+            store: Mutex::new(HashMap::new()),
+        }
     }
 
     pub fn with(groups: Vec<Group>) -> Self {
@@ -78,7 +256,13 @@ impl GroupRepository for FakeGroupRepo {
     }
 
     async fn find_by_name(&self, name: &str) -> Result<Option<Group>, DomainError> {
-        Ok(self.store.lock().unwrap().values().find(|g| g.name == name).cloned())
+        Ok(self
+            .store
+            .lock()
+            .unwrap()
+            .values()
+            .find(|g| g.name == name)
+            .cloned())
     }
 
     async fn save(&self, group: &Group) -> Result<(), DomainError> {
@@ -100,7 +284,9 @@ pub struct FakeUserRepo {
 
 impl FakeUserRepo {
     pub fn empty() -> Self {
-        Self { store: Mutex::new(HashMap::new()) }
+        Self {
+            store: Mutex::new(HashMap::new()),
+        }
     }
 
     pub fn with(users: Vec<User>) -> Self {
@@ -160,7 +346,13 @@ impl UserRepository for FakeUserRepo {
     }
 
     async fn find_by_username(&self, username: &str) -> Result<Option<User>, DomainError> {
-        Ok(self.store.lock().unwrap().values().find(|u| u.username == username).cloned())
+        Ok(self
+            .store
+            .lock()
+            .unwrap()
+            .values()
+            .find(|u| u.username == username)
+            .cloned())
     }
 
     async fn save(&self, user: &User) -> Result<(), DomainError> {

@@ -89,7 +89,9 @@ impl UserService {
         let hash = self.hasher.hash(&new_password)?;
         user.set_password_hash(hash);
         self.repo.save(&user).await?;
-        Ok(ResetPasswordResponse { password: new_password })
+        Ok(ResetPasswordResponse {
+            password: new_password,
+        })
     }
 }
 
@@ -106,7 +108,12 @@ mod tests {
     use crate::domain::user::{User, UserRole, UserStatus};
 
     fn make_user(username: &str) -> User {
-        User::new(username.into(), "hashed:pass".into(), None, UserRole::Regular)
+        User::new(
+            username.into(),
+            "hashed:pass".into(),
+            None,
+            UserRole::Regular,
+        )
     }
 
     fn svc(users: Vec<User>) -> UserService {
@@ -120,7 +127,14 @@ mod tests {
     #[tokio::test]
     async fn list_empty_store() {
         let result = empty()
-            .list(UserFilter { search: None, group_id: None, status: None }, PageParams::default())
+            .list(
+                UserFilter {
+                    search: None,
+                    group_id: None,
+                    status: None,
+                },
+                PageParams::default(),
+            )
             .await
             .unwrap();
         assert!(result.data.is_empty());
@@ -131,7 +145,11 @@ mod tests {
     async fn list_filters_by_username_search() {
         let result = svc(vec![make_user("alice"), make_user("bob")])
             .list(
-                UserFilter { search: Some("ali".into()), group_id: None, status: None },
+                UserFilter {
+                    search: Some("ali".into()),
+                    group_id: None,
+                    status: None,
+                },
                 PageParams::default(),
             )
             .await
@@ -147,7 +165,11 @@ mod tests {
         u.group_id = Some(gid);
         let result = svc(vec![u, make_user("bob")])
             .list(
-                UserFilter { search: None, group_id: Some(gid), status: None },
+                UserFilter {
+                    search: None,
+                    group_id: Some(gid),
+                    status: None,
+                },
                 PageParams::default(),
             )
             .await
@@ -162,7 +184,11 @@ mod tests {
         inactive.status = UserStatus::Inactive;
         let result = svc(vec![inactive, make_user("bob")])
             .list(
-                UserFilter { search: None, group_id: None, status: Some(UserStatus::Active) },
+                UserFilter {
+                    search: None,
+                    group_id: None,
+                    status: Some(UserStatus::Active),
+                },
                 PageParams::default(),
             )
             .await
@@ -189,7 +215,12 @@ mod tests {
     #[tokio::test]
     async fn create_saves_new_user_with_regular_role_by_default() {
         let resp = empty()
-            .create(CreateUserRequest { username: "dave".into(), password: "secret".into(), group_id: None, role: None })
+            .create(CreateUserRequest {
+                username: "dave".into(),
+                password: "secret".into(),
+                group_id: None,
+                role: None,
+            })
             .await
             .unwrap();
         assert_eq!(resp.username, "dave");
@@ -213,7 +244,12 @@ mod tests {
     #[tokio::test]
     async fn create_rejects_duplicate_username() {
         let err = svc(vec![make_user("eve")])
-            .create(CreateUserRequest { username: "eve".into(), password: "pass".into(), group_id: None, role: None })
+            .create(CreateUserRequest {
+                username: "eve".into(),
+                password: "pass".into(),
+                group_id: None,
+                role: None,
+            })
             .await
             .unwrap_err();
         assert!(matches!(err, DomainError::UsernameTaken(_)));
@@ -224,7 +260,14 @@ mod tests {
         let u = make_user("old");
         let id = u.id;
         let resp = svc(vec![u])
-            .update(id, UpdateUserRequest { username: Some("new".into()), group_id: None, status: None })
+            .update(
+                id,
+                UpdateUserRequest {
+                    username: Some("new".into()),
+                    group_id: None,
+                    status: None,
+                },
+            )
             .await
             .unwrap();
         assert_eq!(resp.username, "new");
@@ -236,7 +279,14 @@ mod tests {
         let u2 = make_user("bob");
         let id2 = u2.id;
         let err = svc(vec![u1, u2])
-            .update(id2, UpdateUserRequest { username: Some("alice".into()), group_id: None, status: None })
+            .update(
+                id2,
+                UpdateUserRequest {
+                    username: Some("alice".into()),
+                    group_id: None,
+                    status: None,
+                },
+            )
             .await
             .unwrap_err();
         assert!(matches!(err, DomainError::UsernameTaken(_)));
@@ -248,7 +298,10 @@ mod tests {
         let id = u.id;
         let service = svc(vec![u]);
         service.delete(id).await.unwrap();
-        assert!(matches!(service.get(id).await.unwrap_err(), DomainError::UserNotFound(_)));
+        assert!(matches!(
+            service.get(id).await.unwrap_err(),
+            DomainError::UserNotFound(_)
+        ));
     }
 
     #[tokio::test]

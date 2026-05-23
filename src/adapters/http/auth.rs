@@ -8,8 +8,7 @@ use crate::application::dto::user::{LoginRequest, LoginResponse};
 use crate::infrastructure::state::AppState;
 
 pub fn router() -> Router<AppState> {
-    Router::new()
-        .route("/login", post(login))
+    Router::new().route("/login", post(login))
 }
 
 async fn login(
