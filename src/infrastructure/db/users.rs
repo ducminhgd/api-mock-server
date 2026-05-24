@@ -89,7 +89,8 @@ impl UserRepository for SqlxUserRepository {
         let offset = page.offset() as i64;
 
         let rows = sqlx::query(
-            "SELECT id, username, password_hash, group_id, role, status, created_at, updated_at \
+            "SELECT id, username, password_hash, group_id, role, status, \
+                    CAST(created_at AS TEXT) as created_at, CAST(updated_at AS TEXT) as updated_at \
              FROM users \
              WHERE (? IS NULL OR username LIKE ?) \
                AND (? IS NULL OR group_id = ?) \
@@ -134,7 +135,8 @@ impl UserRepository for SqlxUserRepository {
     async fn find_by_id(&self, id: Uuid) -> Result<User, DomainError> {
         let id_str = id.to_string();
         let row = sqlx::query(
-            "SELECT id, username, password_hash, group_id, role, status, created_at, updated_at \
+            "SELECT id, username, password_hash, group_id, role, status, \
+                    CAST(created_at AS TEXT) as created_at, CAST(updated_at AS TEXT) as updated_at \
              FROM users WHERE id = ?",
         )
         .bind(&id_str)
@@ -148,7 +150,8 @@ impl UserRepository for SqlxUserRepository {
 
     async fn find_by_username(&self, username: &str) -> Result<Option<User>, DomainError> {
         let row = sqlx::query(
-            "SELECT id, username, password_hash, group_id, role, status, created_at, updated_at \
+            "SELECT id, username, password_hash, group_id, role, status, \
+                    CAST(created_at AS TEXT) as created_at, CAST(updated_at AS TEXT) as updated_at \
              FROM users WHERE username = ?",
         )
         .bind(username)

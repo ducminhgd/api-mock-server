@@ -1,8 +1,14 @@
-use leptos::prelude::*;
+pub mod api;
+pub mod auth;
+pub mod collections;
+pub mod components;
+pub mod endpoints;
+pub mod groups;
+pub mod layout;
+pub mod users;
 
-#[component]
-pub fn HomePage() -> impl IntoView {
-    view! {
-        <h1>"API Mock Server"</h1>
-    }
-}
+pub use auth::{AuthCtx, LoginPage};
+pub use collections::{CollectionDetailPage, CollectionsPage};
+pub use groups::GroupsPage;
+pub use layout::{AppShell, Protected};
+pub use users::UsersPage;

@@ -74,7 +74,9 @@ impl GroupRepository for SqlxGroupRepository {
         let offset = page.offset() as i64;
 
         let rows = sqlx::query(
-            "SELECT id, name, description, status, created_at, updated_at FROM groups \
+            "SELECT id, name, description, status, \
+                    CAST(created_at AS TEXT) as created_at, CAST(updated_at AS TEXT) as updated_at \
+             FROM groups \
              WHERE (? IS NULL OR name LIKE ?) AND (? IS NULL OR status = ?) \
              ORDER BY name ASC LIMIT ? OFFSET ?",
         )
@@ -109,7 +111,9 @@ impl GroupRepository for SqlxGroupRepository {
     async fn find_by_id(&self, id: Uuid) -> Result<Group, DomainError> {
         let id_str = id.to_string();
         let row = sqlx::query(
-            "SELECT id, name, description, status, created_at, updated_at FROM groups WHERE id = ?",
+            "SELECT id, name, description, status, \
+                    CAST(created_at AS TEXT) as created_at, CAST(updated_at AS TEXT) as updated_at \
+             FROM groups WHERE id = ?",
         )
         .bind(&id_str)
         .fetch_optional(&self.pool)
@@ -122,7 +126,9 @@ impl GroupRepository for SqlxGroupRepository {
 
     async fn find_by_name(&self, name: &str) -> Result<Option<Group>, DomainError> {
         let row = sqlx::query(
-            "SELECT id, name, description, status, created_at, updated_at FROM groups WHERE name = ?",
+            "SELECT id, name, description, status, \
+                    CAST(created_at AS TEXT) as created_at, CAST(updated_at AS TEXT) as updated_at \
+             FROM groups WHERE name = ?",
         )
         .bind(name)
         .fetch_optional(&self.pool)

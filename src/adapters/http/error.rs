@@ -29,7 +29,8 @@ impl From<DomainError> for ApiError {
             DomainError::GroupNotFound(_)
             | DomainError::UserNotFound(_)
             | DomainError::CollectionNotFound(_)
-            | DomainError::CollectionShareNotFound(_) => {
+            | DomainError::CollectionShareNotFound(_)
+            | DomainError::EndpointNotFound(_) => {
                 ApiError(StatusCode::NOT_FOUND, "NOT_FOUND", e.to_string())
             }
             DomainError::UsernameTaken(_)

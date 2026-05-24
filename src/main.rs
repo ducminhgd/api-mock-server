@@ -1,3 +1,5 @@
+#![recursion_limit = "512"]
+
 #[cfg(feature = "ssr")]
 #[tokio::main]
 async fn main() {
@@ -6,7 +8,10 @@ async fn main() {
     use api_mock_server::adapters::http as http_adapters;
     use api_mock_server::application::services::auth::AuthService;
     use api_mock_server::application::services::collections::CollectionService;
+    use api_mock_server::application::services::endpoints::EndpointService;
     use api_mock_server::application::services::groups::GroupService;
+    use api_mock_server::application::services::import_export::ImportExportService;
+    use api_mock_server::application::services::mocks::MockService;
     use api_mock_server::application::services::users::UserService;
     use api_mock_server::infrastructure::auth::jwt::JwtIssuer;
     use api_mock_server::infrastructure::auth::password::BcryptHasher;
@@ -14,11 +19,12 @@ async fn main() {
     use api_mock_server::infrastructure::db;
     use api_mock_server::infrastructure::db::collection_shares::SqlxCollectionShareRepository;
     use api_mock_server::infrastructure::db::collections::SqlxCollectionRepository;
+    use api_mock_server::infrastructure::db::endpoints::SqlxEndpointRepository;
     use api_mock_server::infrastructure::db::groups::SqlxGroupRepository;
     use api_mock_server::infrastructure::db::users::SqlxUserRepository;
     use api_mock_server::infrastructure::state::AppState;
     use api_mock_server::{shell, App};
-    use axum::{http::StatusCode, Router};
+    use axum::Router;
     use leptos::prelude::*;
     use leptos_axum::{generate_route_list, LeptosRoutes};
 
@@ -37,18 +43,32 @@ async fn main() {
     let user_repo = Arc::new(SqlxUserRepository::new(pool.clone()));
     let collection_repo = Arc::new(SqlxCollectionRepository::new(pool.clone()));
     let collection_share_repo = Arc::new(SqlxCollectionShareRepository::new(pool.clone()));
+    let endpoint_repo = Arc::new(SqlxEndpointRepository::new(pool.clone()));
 
-    let conf = get_configuration(None).expect("failed to load Leptos configuration");
+    let conf = get_configuration(Some("Cargo.toml")).expect("failed to load Leptos configuration");
     let leptos_options = conf.leptos_options;
     let addr = leptos_options.site_addr;
     let routes = generate_route_list(App);
 
     let app_state = AppState {
         collections: Arc::new(CollectionService::new(
-            collection_repo,
-            collection_share_repo,
+            collection_repo.clone(),
+            collection_share_repo.clone(),
+            endpoint_repo.clone(),
             user_repo.clone(),
         )),
+        endpoints: Arc::new(EndpointService::new(
+            endpoint_repo.clone(),
+            collection_repo.clone(),
+            collection_share_repo.clone(),
+            user_repo.clone(),
+        )),
+        import_export: Arc::new(ImportExportService::new(
+            collection_repo.clone(),
+            endpoint_repo.clone(),
+            collection_share_repo.clone(),
+        )),
+        mocks: Arc::new(MockService::new(collection_repo, endpoint_repo)),
         groups: Arc::new(GroupService::new(group_repo)),
         users: Arc::new(UserService::new(user_repo.clone(), hasher.clone())),
         auth: Arc::new(AuthService::new(user_repo, hasher, jwt.clone())),
@@ -56,12 +76,9 @@ async fn main() {
         leptos_options: leptos_options.clone(),
     };
 
-    let mocks_router = Router::<AppState>::new()
-        .fallback(|| async { (StatusCode::NOT_IMPLEMENTED, "Not Implemented") });
-
     let app = Router::new()
-        .nest("/api", http_adapters::router())
-        .nest("/mocks", mocks_router)
+        .nest("/api", http_adapters::api_router())
+        .nest("/mocks", http_adapters::mocks_router())
         .leptos_routes(&app_state, routes, {
             let leptos_options = leptos_options.clone();
             move || shell(leptos_options.clone())

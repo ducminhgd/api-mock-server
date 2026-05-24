@@ -5,16 +5,21 @@ pub mod collections;
 pub mod error;
 pub mod extractor;
 pub mod groups;
+pub mod mocks;
 pub mod users;
 
 use axum::Router;
 
 use crate::infrastructure::state::AppState;
 
-pub fn router() -> Router<AppState> {
+pub fn api_router() -> Router<AppState> {
     Router::new()
         .nest("/auth", auth::router())
         .nest("/collections", collections::router())
         .nest("/groups", groups::router())
         .nest("/users", users::router())
+}
+
+pub fn mocks_router() -> Router<AppState> {
+    mocks::router()
 }

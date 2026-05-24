@@ -11,14 +11,16 @@ use crate::application::dto::collection_share::{
 use crate::application::dto::pagination::{PageParams, Paginated};
 use crate::application::repositories::collection::CollectionRepository;
 use crate::application::repositories::collection_share::CollectionShareRepository;
+use crate::application::repositories::endpoint::EndpointRepository;
 use crate::application::repositories::user::UserRepository;
-use crate::domain::collection::{Collection, CollectionVisibility};
+use crate::domain::collection::{slugify_code, Collection, CollectionVisibility};
 use crate::domain::collection_share::CollectionShare;
 use crate::domain::errors::DomainError;
 
 pub struct CollectionService {
     collection_repo: Arc<dyn CollectionRepository>,
     share_repo: Arc<dyn CollectionShareRepository>,
+    endpoint_repo: Arc<dyn EndpointRepository>,
     user_repo: Arc<dyn UserRepository>,
 }
 
@@ -26,11 +28,13 @@ impl CollectionService {
     pub fn new(
         collection_repo: Arc<dyn CollectionRepository>,
         share_repo: Arc<dyn CollectionShareRepository>,
+        endpoint_repo: Arc<dyn EndpointRepository>,
         user_repo: Arc<dyn UserRepository>,
     ) -> Self {
         Self {
             collection_repo,
             share_repo,
+            endpoint_repo,
             user_repo,
         }
     }
@@ -71,7 +75,17 @@ impl CollectionService {
         req: CreateCollectionRequest,
     ) -> Result<CollectionResponse, DomainError> {
         let visibility = req.visibility.unwrap_or(CollectionVisibility::Private);
-        let collection = Collection::new(req.name, req.description, caller_id, visibility);
+        let code = req
+            .code
+            .filter(|c| !c.is_empty())
+            .unwrap_or_else(|| slugify_code(&req.name));
+        if self.collection_repo.find_by_code(&code).await.is_ok() {
+            return Err(DomainError::Conflict(format!(
+                "collection code '{}' is already in use",
+                code
+            )));
+        }
+        let collection = Collection::new(req.name, code, req.description, caller_id, visibility);
         self.collection_repo.save(&collection).await?;
         Ok(CollectionResponse::from(collection))
     }
@@ -86,7 +100,23 @@ impl CollectionService {
         if !Self::is_owner(&collection, caller_id) {
             return Err(DomainError::Forbidden);
         }
-        collection.apply_update(req.name, req.description, req.status, req.visibility);
+        if let Some(ref new_code) = req.code {
+            if new_code != &collection.code
+                && self.collection_repo.find_by_code(new_code).await.is_ok()
+            {
+                return Err(DomainError::Conflict(format!(
+                    "collection code '{}' is already in use",
+                    new_code
+                )));
+            }
+        }
+        collection.apply_update(
+            req.name,
+            req.code,
+            req.description,
+            req.status,
+            req.visibility,
+        );
         self.collection_repo.save(&collection).await?;
         Ok(CollectionResponse::from(collection))
     }
@@ -96,6 +126,7 @@ impl CollectionService {
         if !Self::is_owner(&collection, caller_id) {
             return Err(DomainError::Forbidden);
         }
+        self.endpoint_repo.delete_by_collection(id).await?;
         self.share_repo.delete_by_collection(id).await?;
         self.collection_repo.delete(id).await
     }
@@ -109,13 +140,23 @@ impl CollectionService {
         if !self.has_access(&original, caller_id).await? {
             return Err(DomainError::Forbidden);
         }
+        let copy_code = format!(
+            "{}-{}",
+            original.code,
+            &uuid::Uuid::new_v4().to_string()[..8]
+        );
         let copy = Collection::new(
             format!("{} (copy)", original.name),
+            copy_code,
             original.description,
             caller_id,
             original.visibility,
         );
         self.collection_repo.save(&copy).await?;
+        let endpoints = self.endpoint_repo.find_all_by_collection(id).await?;
+        for ep in endpoints {
+            self.endpoint_repo.save(&ep.copy_to(copy.id)).await?;
+        }
         Ok(CollectionResponse::from(copy))
     }
 
@@ -264,7 +305,7 @@ mod tests {
     use crate::application::dto::collection_share::{CreateShareRequest, UpdateShareRequest};
     use crate::application::dto::pagination::PageParams;
     use crate::application::services::fakes::{
-        FakeCollectionRepo, FakeCollectionShareRepo, FakeUserRepo,
+        FakeCollectionRepo, FakeCollectionShareRepo, FakeEndpointRepo, FakeUserRepo,
     };
     use crate::domain::collection::{Collection, CollectionStatus, CollectionVisibility};
     use crate::domain::collection_share::{CollectionShare, ShareRole};
@@ -276,7 +317,13 @@ mod tests {
     }
 
     fn make_collection(name: &str, owner_id: Uuid) -> Collection {
-        Collection::new(name.into(), None, owner_id, CollectionVisibility::Private)
+        Collection::new(
+            name.into(),
+            slugify_code(name),
+            None,
+            owner_id,
+            CollectionVisibility::Private,
+        )
     }
 
     fn no_filter() -> CollectionFilter {
@@ -296,6 +343,7 @@ mod tests {
         let service = CollectionService::new(
             Arc::new(FakeCollectionRepo::with(collections)),
             Arc::new(FakeCollectionShareRepo::with(shares)),
+            Arc::new(FakeEndpointRepo::empty()),
             Arc::new(FakeUserRepo::with(vec![caller])),
         );
         (service, caller_id)
@@ -393,6 +441,7 @@ mod tests {
         let owner_id = owner.id;
         let public = Collection::new(
             "Public".into(),
+            "public".into(),
             None,
             owner_id,
             CollectionVisibility::Public,
@@ -420,6 +469,7 @@ mod tests {
         let service = CollectionService::new(
             Arc::new(FakeCollectionRepo::with(vec![])),
             Arc::new(FakeCollectionShareRepo::empty()),
+            Arc::new(FakeEndpointRepo::empty()),
             Arc::new(FakeUserRepo::empty()),
         );
         let err = service
@@ -455,6 +505,7 @@ mod tests {
             Arc::new(FakeCollectionShareRepo::with(vec![
                 CollectionShare::new_user(c.id, viewer_id, ShareRole::Viewer),
             ])),
+            Arc::new(FakeEndpointRepo::empty()),
             Arc::new(FakeUserRepo::with(vec![owner, viewer])),
         );
         let resp = service.get(c.id, viewer_id).await.unwrap();
@@ -470,6 +521,7 @@ mod tests {
         let service = CollectionService::new(
             Arc::new(FakeCollectionRepo::with(vec![c.clone()])),
             Arc::new(FakeCollectionShareRepo::empty()),
+            Arc::new(FakeEndpointRepo::empty()),
             Arc::new(FakeUserRepo::with(vec![owner, stranger])),
         );
         let err = service.get(c.id, stranger_id).await.unwrap_err();
@@ -495,6 +547,7 @@ mod tests {
                 caller_id,
                 CreateCollectionRequest {
                     name: "New".into(),
+                    code: None,
                     description: None,
                     visibility: None,
                 },
@@ -514,6 +567,7 @@ mod tests {
                 caller_id,
                 CreateCollectionRequest {
                     name: "C".into(),
+                    code: None,
                     description: None,
                     visibility: None,
                 },
@@ -532,6 +586,7 @@ mod tests {
                 caller_id,
                 CreateCollectionRequest {
                     name: "C".into(),
+                    code: None,
                     description: None,
                     visibility: Some(CollectionVisibility::Public),
                 },
@@ -550,6 +605,7 @@ mod tests {
                 caller_id,
                 CreateCollectionRequest {
                     name: "C".into(),
+                    code: None,
                     description: Some("My description".into()),
                     visibility: None,
                 },
@@ -574,6 +630,7 @@ mod tests {
                 caller_id,
                 UpdateCollectionRequest {
                     name: Some("New".into()),
+                    code: None,
                     description: None,
                     status: None,
                     visibility: None,
@@ -593,6 +650,7 @@ mod tests {
         let service = CollectionService::new(
             Arc::new(FakeCollectionRepo::with(vec![c.clone()])),
             Arc::new(FakeCollectionShareRepo::empty()),
+            Arc::new(FakeEndpointRepo::empty()),
             Arc::new(FakeUserRepo::with(vec![owner, stranger])),
         );
         let err = service
@@ -601,6 +659,7 @@ mod tests {
                 stranger_id,
                 UpdateCollectionRequest {
                     name: Some("X".into()),
+                    code: None,
                     description: None,
                     status: None,
                     visibility: None,
@@ -621,6 +680,7 @@ mod tests {
                 caller_id,
                 UpdateCollectionRequest {
                     name: None,
+                    code: None,
                     description: None,
                     status: None,
                     visibility: None,
@@ -654,6 +714,7 @@ mod tests {
         let service = CollectionService::new(
             Arc::new(FakeCollectionRepo::with(vec![c.clone()])),
             Arc::new(FakeCollectionShareRepo::empty()),
+            Arc::new(FakeEndpointRepo::empty()),
             Arc::new(FakeUserRepo::with(vec![owner, stranger])),
         );
         let err = service.delete(c.id, stranger_id).await.unwrap_err();
@@ -692,6 +753,7 @@ mod tests {
         let service = CollectionService::new(
             Arc::new(FakeCollectionRepo::with(vec![c.clone()])),
             Arc::new(FakeCollectionShareRepo::with(vec![share])),
+            Arc::new(FakeEndpointRepo::empty()),
             Arc::new(FakeUserRepo::with(vec![owner, viewer])),
         );
         let copy = service.duplicate(c.id, viewer_id).await.unwrap();
@@ -707,6 +769,7 @@ mod tests {
         let service = CollectionService::new(
             Arc::new(FakeCollectionRepo::with(vec![c.clone()])),
             Arc::new(FakeCollectionShareRepo::empty()),
+            Arc::new(FakeEndpointRepo::empty()),
             Arc::new(FakeUserRepo::with(vec![owner, stranger])),
         );
         let err = service.duplicate(c.id, stranger_id).await.unwrap_err();
@@ -747,6 +810,7 @@ mod tests {
         let service = CollectionService::new(
             Arc::new(FakeCollectionRepo::with(vec![c.clone()])),
             Arc::new(FakeCollectionShareRepo::empty()),
+            Arc::new(FakeEndpointRepo::empty()),
             Arc::new(FakeUserRepo::with(vec![owner, stranger])),
         );
         let err = service.list_shares(c.id, stranger_id).await.unwrap_err();
@@ -898,6 +962,7 @@ mod tests {
         let service = CollectionService::new(
             Arc::new(FakeCollectionRepo::with(vec![c.clone()])),
             Arc::new(FakeCollectionShareRepo::empty()),
+            Arc::new(FakeEndpointRepo::empty()),
             Arc::new(FakeUserRepo::with(vec![owner, stranger])),
         );
         let err = service
@@ -950,6 +1015,7 @@ mod tests {
         let service = CollectionService::new(
             Arc::new(FakeCollectionRepo::with(vec![c.clone()])),
             Arc::new(FakeCollectionShareRepo::with(vec![share])),
+            Arc::new(FakeEndpointRepo::empty()),
             Arc::new(FakeUserRepo::with(vec![owner, stranger])),
         );
         let err = service
@@ -1015,6 +1081,7 @@ mod tests {
         let service = CollectionService::new(
             Arc::new(FakeCollectionRepo::with(vec![c.clone()])),
             Arc::new(FakeCollectionShareRepo::with(vec![share])),
+            Arc::new(FakeEndpointRepo::empty()),
             Arc::new(FakeUserRepo::with(vec![owner, stranger])),
         );
         let err = service
@@ -1049,6 +1116,7 @@ mod tests {
         let service = CollectionService::new(
             Arc::new(FakeCollectionRepo::with(vec![c.clone()])),
             Arc::new(FakeCollectionShareRepo::empty()),
+            Arc::new(FakeEndpointRepo::empty()),
             Arc::new(FakeUserRepo::with(vec![owner, new_owner])),
         );
         let resp = service
@@ -1069,6 +1137,7 @@ mod tests {
         let service = CollectionService::new(
             Arc::new(FakeCollectionRepo::with(vec![c.clone()])),
             Arc::new(FakeCollectionShareRepo::empty()),
+            Arc::new(FakeEndpointRepo::empty()),
             Arc::new(FakeUserRepo::with(vec![owner, stranger, new_owner])),
         );
         let err = service
@@ -1106,6 +1175,7 @@ mod tests {
         let service = CollectionService::new(
             Arc::new(FakeCollectionRepo::with(vec![])),
             Arc::new(FakeCollectionShareRepo::empty()),
+            Arc::new(FakeEndpointRepo::empty()),
             Arc::new(FakeUserRepo::with(vec![owner, new_owner])),
         );
         let err = service
