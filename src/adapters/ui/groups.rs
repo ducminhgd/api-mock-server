@@ -111,7 +111,7 @@ pub fn GroupsPage() -> impl IntoView {
                                 </table>
                             </div>
                             <Pagination
-                                page=meta.page
+                                page=page
                                 total=meta.total
                                 limit=meta.limit
                                 on_page=move |p| page.set(p)

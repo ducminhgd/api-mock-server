@@ -123,7 +123,7 @@ pub fn EndpointList(collection_id: String, collection_code: String) -> impl Into
                                 </table>
                             </div>
                             <Pagination
-                                page=meta.page
+                                page=page
                                 total=meta.total
                                 limit=meta.limit
                                 on_page=move |p| page.set(p)
