@@ -141,6 +141,77 @@ pub fn parse_single_bru(collection_name: &str, content: &str) -> Option<Imported
 }
 
 fn bru_to_endpoint(content: &str) -> Option<ImportedEndpoint> {
+    // Dispatch: YAML format ("meta:") vs old block DSL ("meta {")
+    if content.trim_start().starts_with("meta:") {
+        bru_yaml_to_endpoint(content)
+    } else {
+        bru_dsl_to_endpoint(content)
+    }
+}
+
+// New YAML-based .bru format (Bruno v1.29+)
+fn bru_yaml_to_endpoint(content: &str) -> Option<ImportedEndpoint> {
+    let mut name = "Endpoint".to_string();
+    let mut method: Option<HttpMethod> = None;
+    let mut path = "/".to_string();
+    let mut section = "";
+
+    for line in content.lines() {
+        let raw = line.trim_end();
+
+        // Detect top-level section keys (no leading whitespace)
+        if !raw.starts_with(' ') && !raw.starts_with('\t') {
+            match raw {
+                "meta:" => { section = "meta"; continue; }
+                "http:" => { section = "http"; continue; }
+                _ => { if !raw.is_empty() { section = ""; } continue; }
+            }
+        }
+
+        let kv = raw.trim();
+        match section {
+            "meta" => {
+                if let Some(v) = kv.strip_prefix("name:") {
+                    name = yaml_unquote(v.trim());
+                }
+            }
+            "http" => {
+                if let Some(v) = kv.strip_prefix("method:") {
+                    method = v.trim().to_uppercase().parse::<HttpMethod>().ok();
+                }
+                if let Some(v) = kv.strip_prefix("url:") {
+                    path = extract_path_from_url(&yaml_unquote(v.trim()));
+                }
+            }
+            _ => {}
+        }
+    }
+
+    Some(ImportedEndpoint {
+        name,
+        method: method?,
+        path,
+        status_code: 200,
+        response_headers: None,
+        response_body: None,
+        response_content_type: None,
+        delay_ms: 0,
+    })
+}
+
+// Strip surrounding single or double quotes and unescape '' → '
+fn yaml_unquote(s: &str) -> String {
+    if s.starts_with('\'') && s.ends_with('\'') && s.len() >= 2 {
+        s[1..s.len() - 1].replace("''", "'")
+    } else if s.starts_with('"') && s.ends_with('"') && s.len() >= 2 {
+        s[1..s.len() - 1].replace("\\\"", "\"").replace("\\\\", "\\")
+    } else {
+        s.to_string()
+    }
+}
+
+// Legacy block DSL format parser (Bruno < v1.29)
+fn bru_dsl_to_endpoint(content: &str) -> Option<ImportedEndpoint> {
     let blocks = parse_blocks(content);
 
     let mut name = "Endpoint".to_string();
@@ -235,43 +306,55 @@ fn ours_to_bruno(path: &str) -> String {
     path.replace('{', "{{").replace('}', "}}")
 }
 
+// Wrap a string in YAML single quotes, escaping internal ' as ''
+fn yaml_single_quote(s: &str) -> String {
+    format!("'{}'", s.replace('\'', "''"))
+}
+
 fn endpoint_to_bru(collection_id: Uuid, ep: &Endpoint, seq: usize) -> String {
     let method_lower = ep.method.to_string().to_lowercase();
     let bruno_path = ours_to_bruno(&ep.path);
     let url = format!("{{{{BASE_URL}}}}/mocks/{collection_id}{bruno_path}");
 
-    let mut bru = format!(
-        "meta {{\n  name: {}\n  type: http\n  seq: {seq}\n}}\n\n",
-        ep.name
+    let mut out = format!(
+        "meta:\n  name: {}\n  type: http\n  seq: {seq}\n\n",
+        yaml_single_quote(&ep.name)
     );
 
-    bru.push_str(&format!(
-        "{method_lower} {{\n  url: {url}\n  body: none\n  auth: none\n}}\n\n"
+    out.push_str(&format!(
+        "http:\n  method: {method_lower}\n  url: {}\n  auth:\n    mode: none\n  body:\n    mode: none\n\n",
+        yaml_single_quote(&url)
     ));
 
-    // headers block (always written, even if empty)
-    bru.push_str("headers {\n}\n\n");
+    out.push_str("headers: []\n\n");
 
-    // docs block encodes mock response config
-    let mut docs_lines = vec![format!("Mock status: {}", ep.status_code)];
+    // docs: literal block scalar encodes mock response config
+    let mut doc_lines: Vec<String> = vec![format!("Mock status: {}", ep.status_code)];
     if let Some(ref ct) = ep.response_content_type {
-        docs_lines.push(format!("Mock Content-Type: {ct}"));
+        doc_lines.push(format!("Mock Content-Type: {ct}"));
     }
     if let Some(ref h) = ep.response_headers {
-        docs_lines.push(format!("Mock headers: {h}"));
+        doc_lines.push(format!("Mock headers: {h}"));
     }
     if let Some(ref body) = ep.response_body {
-        docs_lines.push(String::new());
-        docs_lines.push(body.clone());
+        if !body.is_empty() {
+            doc_lines.push(String::new());
+            for line in body.lines() {
+                doc_lines.push(line.to_string());
+            }
+        }
     }
 
-    bru.push_str("docs {\n");
-    for line in &docs_lines {
-        bru.push_str(&format!("  {line}\n"));
+    out.push_str("docs: |\n");
+    for line in &doc_lines {
+        if line.is_empty() {
+            out.push('\n');
+        } else {
+            out.push_str(&format!("  {line}\n"));
+        }
     }
-    bru.push_str("}\n");
 
-    bru
+    out
 }
 
 fn safe_filename(name: &str) -> String {
@@ -385,6 +468,54 @@ mod tests {
         let c = parse_single_bru("My API", &bru).unwrap();
         assert_eq!(c.name, "My API");
         assert_eq!(c.endpoints.len(), 1);
+    }
+
+    fn sample_bru_yaml(name: &str, method: &str, url: &str) -> String {
+        format!(
+            "meta:\n  name: {}\n  type: http\n  seq: 1\n\n\
+             http:\n  method: {method}\n  url: {}\n  auth:\n    mode: none\n  body:\n    mode: none\n\n\
+             headers: []\n\ndocs: |\n  Mock status: 200\n",
+            yaml_single_quote(name),
+            yaml_single_quote(url),
+        )
+    }
+
+    #[test]
+    fn bru_yaml_extracts_name_and_method() {
+        let bru = sample_bru_yaml("List Users", "get", "{{BASE_URL}}/users");
+        let ep = bru_to_endpoint(&bru).unwrap();
+        assert_eq!(ep.name, "List Users");
+        assert_eq!(ep.method, HttpMethod::Get);
+    }
+
+    #[test]
+    fn bru_yaml_extracts_path() {
+        let bru = sample_bru_yaml("Get User", "get", "{{BASE_URL}}/users/{{id}}");
+        let ep = bru_to_endpoint(&bru).unwrap();
+        assert_eq!(ep.path, "/users/{id}");
+    }
+
+    #[test]
+    fn bru_yaml_single_quote_roundtrip() {
+        let name = "O'Brien's endpoint";
+        let bru = sample_bru_yaml(name, "get", "{{BASE_URL}}/test");
+        let ep = bru_to_endpoint(&bru).unwrap();
+        assert_eq!(ep.name, name);
+    }
+
+    #[test]
+    fn endpoint_to_bru_generates_yaml() {
+        use crate::domain::collection::{Collection, CollectionVisibility};
+        let owner = Uuid::new_v4();
+        let c = Collection::new("Test".into(), None, owner, CollectionVisibility::Private);
+        let ep = Endpoint::new(
+            c.id, "Get Users".into(), HttpMethod::Get, "/users".into(),
+            200, 0, None, None, None,
+        );
+        let bru = endpoint_to_bru(c.id, &ep, 1);
+        assert!(bru.starts_with("meta:\n  name:"), "expected YAML format, got:\n{bru}");
+        assert!(bru.contains("http:\n  method: get\n"));
+        assert!(bru.contains("headers: []"));
     }
 
     #[test]

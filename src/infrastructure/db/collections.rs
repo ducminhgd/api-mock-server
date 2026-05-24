@@ -92,7 +92,7 @@ impl CollectionRepository for SqlxCollectionRepository {
 
         let rows = sqlx::query(
             "SELECT DISTINCT c.id, c.name, c.description, c.owner_id, c.status, c.visibility, \
-                    c.created_at, c.updated_at \
+                    CAST(c.created_at AS TEXT) as created_at, CAST(c.updated_at AS TEXT) as updated_at \
              FROM collections c \
              LEFT JOIN collection_shares cs ON cs.collection_id = c.id \
              WHERE (c.owner_id = ? OR cs.user_id = ? OR (? IS NOT NULL AND cs.group_id = ?)) \
@@ -150,7 +150,8 @@ impl CollectionRepository for SqlxCollectionRepository {
     async fn find_by_id(&self, id: Uuid) -> Result<Collection, DomainError> {
         let id_str = id.to_string();
         let row = sqlx::query(
-            "SELECT id, name, description, owner_id, status, visibility, created_at, updated_at \
+            "SELECT id, name, description, owner_id, status, visibility, \
+                    CAST(created_at AS TEXT) as created_at, CAST(updated_at AS TEXT) as updated_at \
              FROM collections WHERE id = ?",
         )
         .bind(&id_str)

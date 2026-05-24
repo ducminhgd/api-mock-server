@@ -5,6 +5,7 @@ use super::auth::AuthCtx;
 use super::components::{
     ConfirmDelete, EmptyState, ErrorBox, Modal, Pagination, Spinner, StatusBadge,
 };
+use crate::application::dto::group::GroupResponse;
 use crate::application::dto::pagination::Paginated;
 use crate::application::dto::user::{CreateUserRequest, UpdateUserRequest, UserResponse};
 use crate::domain::user::UserStatus;
@@ -235,14 +236,30 @@ fn UserForm(
             .unwrap_or_default(),
     );
     let password = RwSignal::new(String::new());
+    let group_id = RwSignal::new(
+        user.as_ref()
+            .and_then(|u| u.group_id.map(|id| id.to_string()))
+            .unwrap_or_default(),
+    );
     let status = RwSignal::new(
         user.as_ref()
             .map(|u| format!("{}", u.status))
             .unwrap_or_else(|| "active".into()),
     );
+    let groups_list = RwSignal::new(Vec::<GroupResponse>::new());
     let error = RwSignal::<Option<String>>::new(None);
     let pending = RwSignal::new(false);
     let uid = user.as_ref().map(|u| u.id.to_string());
+
+    let token_signal = auth.token; // Copy — for groups Effect
+    Effect::new(move |_| {
+        let token = token_signal.get().unwrap_or_default();
+        leptos::task::spawn_local(async move {
+            if let Ok(gs) = api::list_groups_all(&token).await {
+                groups_list.set(gs);
+            }
+        });
+    });
 
     let title = if is_edit { "Edit User" } else { "New User" };
     let close = on_close.clone();
@@ -264,6 +281,9 @@ fn UserForm(
         let token = auth.token_str();
         let pw = password.get();
         let stat = status.get();
+        let gid_str = group_id.get();
+        let parsed_gid: Option<uuid::Uuid> =
+            if gid_str.is_empty() { None } else { gid_str.parse().ok() };
         let id = uid.clone();
         let done = on_done.clone();
 
@@ -278,7 +298,7 @@ fn UserForm(
                     &id,
                     UpdateUserRequest {
                         username: Some(uname),
-                        group_id: None,
+                        group_id: Some(parsed_gid),
                         status: status_parsed,
                     },
                 )
@@ -290,7 +310,7 @@ fn UserForm(
                     CreateUserRequest {
                         username: uname,
                         password: pw,
-                        group_id: None,
+                        group_id: parsed_gid,
                         role: None,
                     },
                 )
@@ -329,6 +349,22 @@ fn UserForm(
                             />
                         </div>
                     })}
+                    <div class="form-group">
+                        <label class="form-label">"Group (optional)"</label>
+                        <select
+                            on:change=move |ev| group_id.set(event_target_value(&ev))
+                        >
+                            <option value="" selected=move || group_id.get().is_empty()>
+                                "— No group —"
+                            </option>
+                            {move || groups_list.get().into_iter().map(|g| {
+                                let id = g.id.to_string();
+                                let name = g.name.clone();
+                                let selected = group_id.get() == id;
+                                view! { <option value=id selected=selected>{name}</option> }
+                            }).collect_view()}
+                        </select>
+                    </div>
                     {is_edit.then(|| view! {
                         <div class="form-group">
                             <label class="form-label">"Status"</label>

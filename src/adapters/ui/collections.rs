@@ -12,7 +12,9 @@ use crate::application::dto::collection::{
     CollectionResponse, CreateCollectionRequest, UpdateCollectionRequest,
 };
 use crate::application::dto::collection_share::{CreateShareRequest, UpdateShareRequest};
+use crate::application::dto::group::GroupResponse;
 use crate::application::dto::pagination::Paginated;
+use crate::application::dto::user::UserResponse;
 use crate::domain::collection::{CollectionStatus, CollectionVisibility};
 use crate::domain::collection_share::ShareRole;
 
@@ -321,6 +323,8 @@ fn SharesPanel(collection_id: String) -> impl IntoView {
             Result<Vec<crate::application::dto::collection_share::CollectionShareResponse>, String>,
         >,
     );
+    let all_users = RwSignal::new(Vec::<UserResponse>::new());
+    let all_groups = RwSignal::new(Vec::<GroupResponse>::new());
     let token_signal = auth.token; // Copy
 
     Effect::new(move |_| {
@@ -331,6 +335,18 @@ fn SharesPanel(collection_id: String) -> impl IntoView {
         leptos::task::spawn_local(async move {
             let r = api::list_shares(&token, &id).await;
             shares_data.set(Some(r));
+        });
+    });
+
+    Effect::new(move |_| {
+        let token = token_signal.get().unwrap_or_default();
+        leptos::task::spawn_local(async move {
+            if let Ok(us) = api::list_users_all(&token).await {
+                all_users.set(us);
+            }
+            if let Ok(gs) = api::list_groups_all(&token).await {
+                all_groups.set(gs);
+            }
         });
     });
 
@@ -369,6 +385,8 @@ fn SharesPanel(collection_id: String) -> impl IntoView {
                                         >
                                             <ShareRow
                                                 share=s.clone()
+                                                all_users=all_users
+                                                all_groups=all_groups
                                                 collection_id=cid.get_value()
                                                 on_done=move || refresh.update(|n| *n += 1)
                                             />
@@ -381,15 +399,31 @@ fn SharesPanel(collection_id: String) -> impl IntoView {
                 }
             }}
 
-            <div style="max-width:480px">
+            <div style="max-width:520px">
                 <p class="section-label">"Add share"</p>
                 {move || add_error.get().map(|e| view! { <ErrorBox msg=e /> })}
                 <div class="flex-gap">
-                    <input type="text" placeholder="User ID (UUID)"
+                    <select
                         style="flex:1"
-                        prop:value=move || new_user_id.get()
-                        on:input=move |ev| new_user_id.set(event_target_value(&ev))
-                    />
+                        on:change=move |ev| new_user_id.set(event_target_value(&ev))
+                    >
+                        <option value="">
+                            {move || if all_users.get().is_empty() { "Loading users…" } else { "— Select user —" }}
+                        </option>
+                        {move || {
+                            let users = all_users.get();
+                            let groups = all_groups.get();
+                            users.into_iter().map(|u| {
+                                let id = u.id.to_string();
+                                let grp = u.group_id
+                                    .and_then(|gid| groups.iter().find(|g| g.id == gid).map(|g| format!(" ({})", g.name)))
+                                    .unwrap_or_default();
+                                let label = format!("{}{}", u.username, grp);
+                                let selected = new_user_id.get() == id;
+                                view! { <option value=id selected=selected>{label}</option> }
+                            }).collect_view()
+                        }}
+                    </select>
                     <select
                         prop:value=move || new_role.get()
                         on:change=move |ev| new_role.set(event_target_value(&ev))
@@ -400,11 +434,11 @@ fn SharesPanel(collection_id: String) -> impl IntoView {
                     <button class="btn btn-primary btn-sm" on:click=move |_| {
                         let uid_str = new_user_id.get();
                         if uid_str.is_empty() {
-                            add_error.set(Some("User ID is required.".into()));
+                            add_error.set(Some("Please select a user.".into()));
                             return;
                         }
                         let Ok(uid) = uid_str.parse::<uuid::Uuid>() else {
-                            add_error.set(Some("Invalid UUID format.".into()));
+                            add_error.set(Some("Invalid user selection.".into()));
                             return;
                         };
                         let role = match new_role.get().as_str() {
@@ -435,6 +469,8 @@ fn SharesPanel(collection_id: String) -> impl IntoView {
 #[component]
 fn ShareRow(
     share: crate::application::dto::collection_share::CollectionShareResponse,
+    all_users: RwSignal<Vec<UserResponse>>,
+    all_groups: RwSignal<Vec<GroupResponse>>,
     collection_id: String,
     on_done: impl Fn() + Clone + 'static,
 ) -> impl IntoView {
@@ -443,12 +479,27 @@ fn ShareRow(
     let sid = StoredValue::new(share.id.to_string());
     let role = RwSignal::new(format!("{}", share.role).to_lowercase());
 
-    let who = if let Some(uid) = share.user_id {
-        format!("User: {uid}")
-    } else if let Some(gid) = share.group_id {
-        format!("Group: {gid}")
-    } else {
-        "Unknown".into()
+    let share_user_id = share.user_id;
+    let share_group_id = share.group_id;
+    let who = move || {
+        let users = all_users.get();
+        let groups = all_groups.get();
+        if let Some(uid) = share_user_id {
+            users.iter().find(|u| u.id == uid)
+                .map(|u| {
+                    let grp = u.group_id
+                        .and_then(|gid| groups.iter().find(|g| g.id == gid).map(|g| format!(" ({})", g.name)))
+                        .unwrap_or_default();
+                    format!("{}{}", u.username, grp)
+                })
+                .unwrap_or_else(|| format!("User: {uid}"))
+        } else if let Some(gid) = share_group_id {
+            groups.iter().find(|g| g.id == gid)
+                .map(|g| format!("Group: {}", g.name))
+                .unwrap_or_else(|| format!("Group: {gid}"))
+        } else {
+            "Unknown".into()
+        }
     };
 
     let on_remove = {
@@ -491,7 +542,7 @@ fn ShareRow(
 
     view! {
         <tr>
-            <td class="mono text-sm">{who}</td>
+            <td class="text-sm">{who}</td>
             <td>
                 <select
                     prop:value=move || role.get()

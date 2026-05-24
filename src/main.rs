@@ -45,7 +45,7 @@ async fn main() {
     let collection_share_repo = Arc::new(SqlxCollectionShareRepository::new(pool.clone()));
     let endpoint_repo = Arc::new(SqlxEndpointRepository::new(pool.clone()));
 
-    let conf = get_configuration(None).expect("failed to load Leptos configuration");
+    let conf = get_configuration(Some("Cargo.toml")).expect("failed to load Leptos configuration");
     let leptos_options = conf.leptos_options;
     let addr = leptos_options.site_addr;
     let routes = generate_route_list(App);

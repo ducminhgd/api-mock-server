@@ -87,6 +87,16 @@ pub fn LoginPage() -> impl IntoView {
     let auth = use_context::<AuthCtx>().expect("AuthCtx");
     let navigate = use_navigate();
 
+    // If a token is already present (e.g. page reload with existing session),
+    // skip the login form and go straight to the app.
+    let token = auth.token;
+    let nav_for_effect = navigate.clone();
+    Effect::new(move |_| {
+        if token.get().is_some() {
+            nav_for_effect("/collections", Default::default());
+        }
+    });
+
     let username = RwSignal::new(String::new());
     let password = RwSignal::new(String::new());
     let error = RwSignal::<Option<String>>::new(None);

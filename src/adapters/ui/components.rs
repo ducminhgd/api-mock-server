@@ -85,6 +85,14 @@ pub fn Pagination(
             }
         }
     };
+    let on_next = {
+        let on_page = on_page.clone();
+        move |_: leptos::ev::MouseEvent| {
+            if page < total_pages {
+                on_page(page + 1);
+            }
+        }
+    };
     view! {
         <div class="pagination">
             <span class="pagination-info">
@@ -98,10 +106,8 @@ pub fn Pagination(
                 {format!("Page {page} / {total_pages}")}
             </span>
             <button class="btn btn-secondary btn-sm"
-                disabled=move || page >= total_pages
-                on:click=move |_: leptos::ev::MouseEvent| {
-                    if page < total_pages { on_page(page + 1); }
-                }
+                disabled=move || !(page < total_pages)
+                on:click=on_next
             >"Next →"</button>
         </div>
     }

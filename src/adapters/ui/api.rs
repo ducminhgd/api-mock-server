@@ -206,6 +206,16 @@ pub async fn delete_endpoint(token: &str, cid: &str, eid: &str) -> ApiResult<()>
     delete_req(&format!("/api/collections/{cid}/endpoints/{eid}"), token).await
 }
 
+pub async fn list_users_all(token: &str) -> ApiResult<Vec<UserResponse>> {
+    let p: Paginated<UserResponse> = get_json("/api/users?page=1&limit=100", token).await?;
+    Ok(p.data)
+}
+
+pub async fn list_groups_all(token: &str) -> ApiResult<Vec<GroupResponse>> {
+    let p: Paginated<GroupResponse> = get_json("/api/groups?page=1&limit=100", token).await?;
+    Ok(p.data)
+}
+
 pub async fn duplicate_endpoint(token: &str, cid: &str, eid: &str) -> ApiResult<EndpointResponse> {
     post_json_body(
         &format!("/api/collections/{cid}/endpoints/{eid}/duplicate"),

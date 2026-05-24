@@ -268,6 +268,7 @@ fn EndpointForm(
     let pending = RwSignal::new(false);
     let eid = endpoint.as_ref().map(|e| e.id.to_string());
     let cid = collection_id;
+    let cid_for_hint = cid.clone();
 
     let title = if is_edit {
         "Edit Endpoint"
@@ -396,7 +397,10 @@ fn EndpointForm(
                             prop:value=move || path.get()
                             on:input=move |ev| path.set(event_target_value(&ev))
                         />
-                        <p class="form-hint">{r#"Use {<param>} for path parameters."#}</p>
+                        <p class="form-hint">
+                            {r#"Use {<param>} for path parameters. Mock URL: "#}
+                            <code>{move || format!("/mocks/{}{}", cid_for_hint, path.get())}</code>
+                        </p>
                     </div>
                     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.75rem">
                         <div class="form-group">

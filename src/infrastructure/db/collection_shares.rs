@@ -80,7 +80,8 @@ impl CollectionShareRepository for SqlxCollectionShareRepository {
     ) -> Result<Vec<CollectionShare>, DomainError> {
         let cid = collection_id.to_string();
         let rows = sqlx::query(
-            "SELECT id, collection_id, user_id, group_id, role, created_at, updated_at \
+            "SELECT id, collection_id, user_id, group_id, role, \
+                    CAST(created_at AS TEXT) as created_at, CAST(updated_at AS TEXT) as updated_at \
              FROM collection_shares WHERE collection_id = ?",
         )
         .bind(&cid)
@@ -94,7 +95,8 @@ impl CollectionShareRepository for SqlxCollectionShareRepository {
     async fn find_by_id(&self, id: Uuid) -> Result<CollectionShare, DomainError> {
         let id_str = id.to_string();
         let row = sqlx::query(
-            "SELECT id, collection_id, user_id, group_id, role, created_at, updated_at \
+            "SELECT id, collection_id, user_id, group_id, role, \
+                    CAST(created_at AS TEXT) as created_at, CAST(updated_at AS TEXT) as updated_at \
              FROM collection_shares WHERE id = ?",
         )
         .bind(&id_str)
@@ -116,7 +118,8 @@ impl CollectionShareRepository for SqlxCollectionShareRepository {
         let uid = user_id.map(|u| u.to_string());
         let gid = group_id.map(|g| g.to_string());
         let row = sqlx::query(
-            "SELECT id, collection_id, user_id, group_id, role, created_at, updated_at \
+            "SELECT id, collection_id, user_id, group_id, role, \
+                    CAST(created_at AS TEXT) as created_at, CAST(updated_at AS TEXT) as updated_at \
              FROM collection_shares \
              WHERE collection_id = ? \
                AND (user_id IS ? OR (user_id IS NULL AND ? IS NULL)) \

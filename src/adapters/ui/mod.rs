@@ -10,5 +10,5 @@ pub mod users;
 pub use auth::{AuthCtx, LoginPage};
 pub use collections::{CollectionDetailPage, CollectionsPage};
 pub use groups::GroupsPage;
-pub use layout::Protected;
+pub use layout::{AppShell, Protected};
 pub use users::UsersPage;

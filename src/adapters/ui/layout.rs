@@ -1,5 +1,5 @@
 use leptos::prelude::*;
-use leptos_router::components::A;
+use leptos_router::components::{Redirect, A};
 use leptos_router::hooks::{use_location, use_navigate};
 
 use super::auth::AuthCtx;
@@ -54,18 +54,20 @@ fn NavLink(href: &'static str, label: &'static str, icon: &'static str) -> impl 
 
 // ── Auth guard ─────────────────────────────────────────────────────────────
 
-/// Wraps children in AppShell; redirects to /login when no token is present.
+/// Auth guard — renders children when authenticated, redirects to /login otherwise.
+/// Callers are responsible for wrapping their content in AppShell.
 #[component]
-pub fn Protected(children: Children) -> impl IntoView {
+pub fn Protected(children: ChildrenFn) -> impl IntoView {
     let auth = use_context::<AuthCtx>().expect("AuthCtx");
-    let navigate = use_navigate();
-    let token = auth.token; // RwSignal — Copy, usable in Effect and view
+    let token = auth.token; // RwSignal — Copy
 
-    Effect::new(move |_| {
-        if token.get().is_none() {
-            navigate("/login", Default::default());
+    // `children()` calls Box<dyn Fn()> through a shared reference — does NOT
+    // consume `children`, so this closure is Fn (not FnOnce).
+    move || {
+        if token.get().is_some() {
+            children().into_any()
+        } else {
+            view! { <Redirect path="/login" /> }.into_any()
         }
-    });
-
-    view! { <AppShell>{children()}</AppShell> }
+    }
 }

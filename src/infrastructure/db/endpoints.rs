@@ -113,8 +113,8 @@ impl EndpointRepository for SqlxEndpointRepository {
 
         let rows = sqlx::query(
             "SELECT id, collection_id, name, method, path, status_code, \
-                    response_headers, response_body, response_content_type, \
-                    delay_ms, status, created_at, updated_at \
+                    response_headers, response_body, response_content_type, delay_ms, status, \
+                    CAST(created_at AS TEXT) as created_at, CAST(updated_at AS TEXT) as updated_at \
              FROM endpoints \
              WHERE collection_id = ? \
                AND (? IS NULL OR (name LIKE ? OR path LIKE ?)) \
@@ -170,8 +170,8 @@ impl EndpointRepository for SqlxEndpointRepository {
         let cid = collection_id.to_string();
         let rows = sqlx::query(
             "SELECT id, collection_id, name, method, path, status_code, \
-                    response_headers, response_body, response_content_type, \
-                    delay_ms, status, created_at, updated_at \
+                    response_headers, response_body, response_content_type, delay_ms, status, \
+                    CAST(created_at AS TEXT) as created_at, CAST(updated_at AS TEXT) as updated_at \
              FROM endpoints WHERE collection_id = ?",
         )
         .bind(&cid)
@@ -186,8 +186,8 @@ impl EndpointRepository for SqlxEndpointRepository {
         let id_str = id.to_string();
         let row = sqlx::query(
             "SELECT id, collection_id, name, method, path, status_code, \
-                    response_headers, response_body, response_content_type, \
-                    delay_ms, status, created_at, updated_at \
+                    response_headers, response_body, response_content_type, delay_ms, status, \
+                    CAST(created_at AS TEXT) as created_at, CAST(updated_at AS TEXT) as updated_at \
              FROM endpoints WHERE id = ?",
         )
         .bind(&id_str)

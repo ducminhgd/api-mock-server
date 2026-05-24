@@ -10,43 +10,44 @@ pub mod infrastructure;
 pub use domain::errors::DomainError;
 
 use adapters::ui::{
-    AuthCtx, CollectionDetailPage, CollectionsPage, GroupsPage, LoginPage, Protected, UsersPage,
+    AppShell, AuthCtx, CollectionDetailPage, CollectionsPage, GroupsPage, LoginPage, Protected,
+    UsersPage,
 };
 use leptos::prelude::*;
-use leptos_meta::provide_meta_context;
+use leptos_meta::{provide_meta_context, Title};
 use leptos_router::components::{Redirect, Route, Router, Routes};
 
 #[component]
 pub fn App() -> impl IntoView {
     provide_meta_context();
 
-    // Auth context is provided at the top level so all routes can access it.
     let auth = AuthCtx::new();
     provide_context(auth);
 
     view! {
+        <Title text="API Mock Server"/>
         <Router>
             <Routes fallback=|| view! { <NotFound /> }>
                 <Route path=leptos_router::path!("/login")      view=LoginPage />
                 <Route path=leptos_router::path!("/")           view=|| view! { <Redirect path="/collections" /> } />
                 <Route path=leptos_router::path!("/collections") view=|| view! {
                     <Protected>
-                        <CollectionsPage />
+                        <AppShell><CollectionsPage /></AppShell>
                     </Protected>
                 }/>
                 <Route path=leptos_router::path!("/collections/:id") view=|| view! {
                     <Protected>
-                        <CollectionDetailPage />
+                        <AppShell><CollectionDetailPage /></AppShell>
                     </Protected>
                 }/>
                 <Route path=leptos_router::path!("/groups") view=|| view! {
                     <Protected>
-                        <GroupsPage />
+                        <AppShell><GroupsPage /></AppShell>
                     </Protected>
                 }/>
                 <Route path=leptos_router::path!("/users") view=|| view! {
                     <Protected>
-                        <UsersPage />
+                        <AppShell><UsersPage /></AppShell>
                     </Protected>
                 }/>
             </Routes>
@@ -78,7 +79,6 @@ pub fn shell(options: leptos::config::LeptosOptions) -> impl IntoView {
                 <HydrationScripts options=options.clone()/>
                 <HashedStylesheet options id="leptos"/>
                 <MetaTags/>
-                <Title text="API Mock Server"/>
             </head>
             <body>
                 <App/>
