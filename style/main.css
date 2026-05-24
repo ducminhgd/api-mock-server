@@ -278,6 +278,8 @@ tr:last-child td { border-bottom: none; }
 tbody tr:hover td { background: var(--bg-alt); }
 .td-actions { display: flex; gap: .375rem; align-items: center; }
 .mock-url-cell { display: flex; align-items: center; gap: .375rem; }
+.import-format-info { background: var(--bg-alt); border-radius: .375rem; padding: .75rem 1rem; margin-bottom: 1rem; }
+.import-file-picker { display: flex; align-items: center; margin-top: .25rem; }
 .mock-url-link { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: inline-block; vertical-align: middle; color: var(--accent); text-decoration: none; }
 .mock-url-link:hover { text-decoration: underline; }
 .btn-icon { display: inline-flex; align-items: center; justify-content: center; padding: .2rem; border: none; background: none; cursor: pointer; color: var(--text-muted); border-radius: .25rem; flex-shrink: 0; }

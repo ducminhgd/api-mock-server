@@ -70,44 +70,35 @@ pub fn Modal(
 
 #[component]
 pub fn Pagination(
-    page: u32,
+    #[prop(into)] page: Signal<u32>,
     total: u64,
     limit: u32,
     on_page: impl Fn(u32) + Clone + Send + 'static,
 ) -> impl IntoView {
-    let total_pages = ((total as f64) / (limit as f64)).ceil() as u32;
-    let total_pages = total_pages.max(1);
-    let on_prev = {
-        let on_page = on_page.clone();
-        move |_: leptos::ev::MouseEvent| {
-            if page > 1 {
-                on_page(page - 1);
-            }
-        }
-    };
-    let _on_next = {
-        let on_page = on_page.clone();
-        move |_: leptos::ev::MouseEvent| {
-            if page < total_pages {
-                on_page(page + 1);
-            }
-        }
-    };
+    let total_pages = (((total as f64) / (limit as f64)).ceil() as u32).max(1);
+    let on_page_next = on_page.clone();
+
     view! {
         <div class="pagination">
             <span class="pagination-info">
                 {format!("{total} item{}", if total == 1 { "" } else { "s" })}
             </span>
             <button class="btn btn-secondary btn-sm"
-                disabled=move || page <= 1
-                on:click=on_prev
+                prop:disabled={move || page.get() <= 1}
+                on:click=move |_| {
+                    let p = page.get();
+                    if p > 1 { on_page(p - 1); }
+                }
             >"← Prev"</button>
             <span class="text-muted text-sm">
-                {format!("Page {page} / {total_pages}")}
+                {move || format!("Page {} / {total_pages}", page.get())}
             </span>
             <button class="btn btn-secondary btn-sm"
-                disabled=move || page >= total_pages
-                on:click=on_next
+                prop:disabled={move || page.get() >= total_pages}
+                on:click=move |_| {
+                    let p = page.get();
+                    if p < total_pages { on_page_next(p + 1); }
+                }
             >"Next →"</button>
         </div>
     }

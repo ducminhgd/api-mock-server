@@ -39,7 +39,13 @@ impl ImportExportService {
             ));
         }
 
-        let code = slugify_code(&imported.name);
+        let base_code = slugify_code(&imported.name);
+        let code = if self.collection_repo.find_by_code(&base_code).await.is_ok() {
+            let suffix: String = Uuid::new_v4().to_string()[..4].to_uppercase();
+            format!("{}{}", base_code, suffix)
+        } else {
+            base_code
+        };
         let collection = Collection::new(
             imported.name,
             code,

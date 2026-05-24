@@ -124,7 +124,7 @@ pub fn CollectionsPage() -> impl IntoView {
                                 </table>
                             </div>
                             <Pagination
-                                page=meta.page
+                                page=page
                                 total=meta.total
                                 limit=meta.limit
                                 on_page=move |p| page.set(p)
@@ -761,85 +761,198 @@ fn CollectionForm(
     }
 }
 
-// ── Import button ─────────────────────────────────────────────────────────
+// ── Import button + modal ─────────────────────────────────────────────────
 
 #[component]
 fn ImportButton(refresh: RwSignal<u32>) -> impl IntoView {
-    let auth = use_context::<AuthCtx>().expect("AuthCtx");
-    let error = RwSignal::<Option<String>>::new(None);
+    let show_modal = RwSignal::new(false);
 
     view! {
-        <div style="position:relative">
-            {move || error.get().map(|e| view! {
-                <div style="position:fixed;top:1rem;right:1rem;z-index:300;max-width:360px">
-                    <ErrorBox msg=e />
-                    <button class="btn btn-ghost btn-sm" style="margin-top:.25rem"
-                        on:click=move |_| error.set(None)
-                    >"Dismiss"</button>
-                </div>
-            })}
-            <label class="btn btn-secondary" style="cursor:pointer;margin-bottom:0">
+        <>
+            <button class="btn btn-secondary" on:click=move |_| show_modal.set(true)>
                 "⬆ Import"
-                <input
-                    type="file"
-                    accept=".json,.zip,.bru"
-                    style="display:none"
-                    on:change=move |ev| {
-                        handle_file_import(ev, auth.clone(), refresh, error);
-                    }
+            </button>
+            {move || show_modal.get().then(|| view! {
+                <ImportModal
+                    refresh=refresh
+                    on_close=move || show_modal.set(false)
                 />
-            </label>
-        </div>
+            })}
+        </>
     }
 }
 
-fn handle_file_import(
-    ev: leptos::ev::Event,
-    auth: AuthCtx,
+#[component]
+fn ImportModal(
     refresh: RwSignal<u32>,
-    error: RwSignal<Option<String>>,
-) {
+    on_close: impl Fn() + Clone + Send + 'static,
+) -> impl IntoView {
+    let auth = use_context::<AuthCtx>().expect("AuthCtx");
+    let filename = RwSignal::new(String::new());
+    let loading = RwSignal::new(false);
+    let error = RwSignal::<Option<String>>::new(None);
+
+    // Stores the raw file bytes picked by the user (wasm only).
+    let file_bytes = RwSignal::<Option<Vec<u8>>>::new(None);
+
+    let on_file_change = move |ev: leptos::ev::Event| {
+        error.set(None);
+        #[cfg(target_arch = "wasm32")]
+        {
+            use wasm_bindgen::JsCast;
+            use wasm_bindgen_futures::JsFuture;
+            let input = ev
+                .target()
+                .and_then(|t| t.dyn_into::<web_sys::HtmlInputElement>().ok());
+            let files = input.and_then(|i| i.files());
+            let file = files.and_then(|fl| fl.get(0));
+            if let Some(file) = file {
+                let name = file.name();
+                filename.set(name);
+                leptos::task::spawn_local(async move {
+                    if let Ok(ab_val) = JsFuture::from(file.array_buffer()).await {
+                        let arr = js_sys::Uint8Array::new(&ab_val);
+                        file_bytes.set(Some(arr.to_vec()));
+                    }
+                });
+            }
+        }
+        #[cfg(not(target_arch = "wasm32"))]
+        let _ = ev;
+    };
+
+    let on_close2 = on_close.clone();
+    let on_import = move |_| {
+        let token = auth.token_str();
+        let fname = filename.get();
+        let bytes = file_bytes.get();
+
+        if fname.is_empty() || bytes.is_none() {
+            error.set(Some("Please select a file first.".into()));
+            return;
+        }
+
+        loading.set(true);
+        error.set(None);
+        let on_close3 = on_close2.clone();
+        leptos::task::spawn_local(async move {
+            match upload_import(token, fname, bytes.unwrap()).await {
+                Ok(_) => {
+                    refresh.update(|n| *n += 1);
+                    on_close3();
+                }
+                Err(e) => {
+                    loading.set(false);
+                    error.set(Some(e));
+                }
+            }
+        });
+    };
+
+    let on_close_modal = on_close.clone();
+    let on_close_cancel = on_close.clone();
+    view! {
+        <Modal title="Import Collection".to_string() on_close=on_close_modal>
+            <div class="modal-body">
+                <div class="import-format-info">
+                    <p class="text-sm text-muted">"Supported formats:"</p>
+                    <ul class="text-sm" style="margin:.5rem 0 1rem 1.2rem">
+                        <li>"Postman Collection v2.1 ("<code>".json"</code>")"</li>
+                        <li>"Bruno collection ZIP ("<code>".zip"</code>")"</li>
+                        <li>"Bruno single request ("<code>".bru"</code>")"</li>
+                    </ul>
+                </div>
+
+                <div class="import-file-picker">
+                    <label class="btn btn-secondary" style="cursor:pointer;margin-bottom:0">
+                        "Choose File"
+                        <input
+                            type="file"
+                            accept=".json,.zip,.bru"
+                            style="display:none"
+                            on:change=on_file_change
+                        />
+                    </label>
+                    {move || {
+                        let name = filename.get();
+                        if name.is_empty() {
+                            view! { <span class="text-muted text-sm" style="margin-left:.75rem">"No file selected"</span> }.into_any()
+                        } else {
+                            view! { <span class="text-sm" style="margin-left:.75rem">{name}</span> }.into_any()
+                        }
+                    }}
+                </div>
+
+                {move || error.get().map(|e| view! { <div style="margin-top:.75rem"><ErrorBox msg=e /></div> })}
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-ghost" on:click=move |_| on_close_cancel()
+                    prop:disabled=move || loading.get()
+                >"Cancel"</button>
+                <button class="btn btn-primary" on:click=on_import
+                    prop:disabled=move || loading.get() || filename.get().is_empty()
+                >
+                    {move || if loading.get() { "Importing…" } else { "Import" }}
+                </button>
+            </div>
+        </Modal>
+    }
+}
+
+#[allow(unused_variables)]
+async fn upload_import(token: String, filename: String, bytes: Vec<u8>) -> Result<(), String> {
     #[cfg(target_arch = "wasm32")]
     {
-        use wasm_bindgen::JsCast;
-        let input = ev
-            .target()
-            .and_then(|t| t.dyn_into::<web_sys::HtmlInputElement>().ok());
-        let files = input.and_then(|i| i.files());
-        let file = files.and_then(|fl| fl.get(0));
-        if let Some(file) = file {
-            let token = auth.token_str();
-            leptos::task::spawn_local(async move {
-                match upload_import(token, file).await {
-                    Ok(_) => refresh.update(|n| *n += 1),
-                    Err(e) => error.set(Some(e)),
-                }
-            });
+        use js_sys::Uint8Array;
+
+        let arr = Uint8Array::from(bytes.as_slice());
+        let blob_parts = js_sys::Array::new();
+        blob_parts.push(&arr.buffer());
+
+        let blob =
+            web_sys::Blob::new_with_u8_array_sequence(&blob_parts).map_err(|e| format!("{e:?}"))?;
+
+        let form = web_sys::FormData::new().map_err(|e| format!("{e:?}"))?;
+        form.append_with_blob_and_filename("file", &blob, &filename)
+            .map_err(|e| format!("{e:?}"))?;
+
+        let resp = gloo_net::http::Request::post("/api/collections/import")
+            .header("Authorization", &format!("Bearer {token}"))
+            .body(form)
+            .map_err(|e| e.to_string())?
+            .send()
+            .await
+            .map_err(|e| e.to_string())?;
+
+        if resp.ok() {
+            return Ok(());
         }
+
+        // Try to extract a meaningful error message from the JSON body.
+        let status = resp.status();
+        let msg = if let Ok(body) = resp.text().await {
+            if let Ok(val) = serde_json::from_str::<serde_json::Value>(&body) {
+                val.get("message")
+                    .or_else(|| val.get("error"))
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string())
+                    .unwrap_or(body)
+            } else {
+                body
+            }
+        } else {
+            String::new()
+        };
+
+        let detail = if msg.is_empty() {
+            format!("Import failed (HTTP {status})")
+        } else {
+            format!("Import failed: {msg}")
+        };
+        return Err(detail);
     }
     #[cfg(not(target_arch = "wasm32"))]
-    let _ = (ev, auth, refresh, error);
-}
-
-#[cfg(target_arch = "wasm32")]
-async fn upload_import(token: String, file: web_sys::File) -> Result<(), String> {
-    let form = web_sys::FormData::new().map_err(|e| format!("{e:?}"))?;
-    form.append_with_blob_and_filename("file", file.as_ref(), &file.name())
-        .map_err(|e| format!("{e:?}"))?;
-
-    let resp = gloo_net::http::Request::post("/api/collections/import")
-        .header("Authorization", &format!("Bearer {token}"))
-        .body(form)
-        .map_err(|e| e.to_string())?
-        .send()
-        .await
-        .map_err(|e| e.to_string())?;
-
-    if resp.ok() {
-        Ok(())
-    } else {
-        Err(format!("Import failed: HTTP {}", resp.status()))
-    }
+    Ok(())
 }
 
 // ── Export button ─────────────────────────────────────────────────────────
