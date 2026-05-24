@@ -41,7 +41,7 @@ impl From<Endpoint> for EndpointResponse {
     }
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreateEndpointRequest {
     pub name: String,
     pub method: HttpMethod,
@@ -53,7 +53,7 @@ pub struct CreateEndpointRequest {
     pub response_content_type: Option<String>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UpdateEndpointRequest {
     pub name: Option<String>,
     pub method: Option<HttpMethod>,
@@ -66,7 +66,7 @@ pub struct UpdateEndpointRequest {
     pub status: Option<EndpointStatus>,
 }
 
-#[derive(Debug, Clone, Default, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct EndpointFilter {
     pub search: Option<String>,
     pub method: Option<HttpMethod>,
