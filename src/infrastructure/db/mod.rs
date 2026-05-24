@@ -37,7 +37,10 @@ async fn ensure_sqlite_file(database_url: &str) -> Result<(), sqlx::Error> {
             tokio::fs::create_dir_all(parent).await.map_err(|e| {
                 sqlx::Error::Io(std::io::Error::new(
                     e.kind(),
-                    format!("failed to create database directory {}: {e}", parent.display()),
+                    format!(
+                        "failed to create database directory {}: {e}",
+                        parent.display()
+                    ),
                 ))
             })?;
         }

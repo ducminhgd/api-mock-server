@@ -70,7 +70,10 @@ pub fn slugify_code(name: &str) -> String {
     let raw: String = if words.len() > 1 {
         words.iter().filter_map(|w| w.chars().next()).collect()
     } else if let Some(word) = words.first() {
-        word.chars().skip_while(|c| c.is_ascii_digit()).take(3).collect()
+        word.chars()
+            .skip_while(|c| c.is_ascii_digit())
+            .take(3)
+            .collect()
     } else {
         String::new()
     };
@@ -181,14 +184,32 @@ mod tests {
     #[test]
     fn new_assigns_unique_ids() {
         let oid = owner();
-        let a = Collection::new("A".into(), "a".into(), None, oid, CollectionVisibility::Private);
-        let b = Collection::new("A".into(), "a".into(), None, oid, CollectionVisibility::Private);
+        let a = Collection::new(
+            "A".into(),
+            "a".into(),
+            None,
+            oid,
+            CollectionVisibility::Private,
+        );
+        let b = Collection::new(
+            "A".into(),
+            "a".into(),
+            None,
+            oid,
+            CollectionVisibility::Private,
+        );
         assert_ne!(a.id, b.id);
     }
 
     #[test]
     fn new_stores_public_visibility() {
-        let c = Collection::new("Pub".into(), "pub".into(), None, owner(), CollectionVisibility::Public);
+        let c = Collection::new(
+            "Pub".into(),
+            "pub".into(),
+            None,
+            owner(),
+            CollectionVisibility::Public,
+        );
         assert_eq!(c.visibility, CollectionVisibility::Public);
     }
 
@@ -206,7 +227,13 @@ mod tests {
 
     #[test]
     fn apply_update_name_only() {
-        let mut c = Collection::new("Old".into(), "old".into(), None, owner(), CollectionVisibility::Private);
+        let mut c = Collection::new(
+            "Old".into(),
+            "old".into(),
+            None,
+            owner(),
+            CollectionVisibility::Private,
+        );
         let before = c.updated_at;
         c.apply_update(Some("New".into()), None, None, None, None);
         assert_eq!(c.name, "New");
@@ -231,21 +258,39 @@ mod tests {
 
     #[test]
     fn apply_update_sets_description_with_some_some() {
-        let mut c = Collection::new("C".into(), "c".into(), None, owner(), CollectionVisibility::Private);
+        let mut c = Collection::new(
+            "C".into(),
+            "c".into(),
+            None,
+            owner(),
+            CollectionVisibility::Private,
+        );
         c.apply_update(None, None, Some(Some("new desc".into())), None, None);
         assert_eq!(c.description.as_deref(), Some("new desc"));
     }
 
     #[test]
     fn apply_update_status() {
-        let mut c = Collection::new("C".into(), "c".into(), None, owner(), CollectionVisibility::Private);
+        let mut c = Collection::new(
+            "C".into(),
+            "c".into(),
+            None,
+            owner(),
+            CollectionVisibility::Private,
+        );
         c.apply_update(None, None, None, Some(CollectionStatus::Inactive), None);
         assert_eq!(c.status, CollectionStatus::Inactive);
     }
 
     #[test]
     fn apply_update_visibility() {
-        let mut c = Collection::new("C".into(), "c".into(), None, owner(), CollectionVisibility::Private);
+        let mut c = Collection::new(
+            "C".into(),
+            "c".into(),
+            None,
+            owner(),
+            CollectionVisibility::Private,
+        );
         c.apply_update(None, None, None, None, Some(CollectionVisibility::Public));
         assert_eq!(c.visibility, CollectionVisibility::Public);
     }

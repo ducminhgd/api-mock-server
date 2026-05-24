@@ -215,7 +215,8 @@ fn UserRow(
     let gid = user.group_id;
     let group_name = move || {
         if let Some(gid) = gid {
-            all_groups.get()
+            all_groups
+                .get()
                 .into_iter()
                 .find(|g| g.id == gid)
                 .map(|g| g.name)
@@ -310,8 +311,11 @@ fn UserForm(
         let pw = password.get();
         let stat = status.get();
         let gid_str = group_id.get();
-        let parsed_gid: Option<uuid::Uuid> =
-            if gid_str.is_empty() { None } else { gid_str.parse().ok() };
+        let parsed_gid: Option<uuid::Uuid> = if gid_str.is_empty() {
+            None
+        } else {
+            gid_str.parse().ok()
+        };
         let id = uid.clone();
         let done = on_done.clone();
 

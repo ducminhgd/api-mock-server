@@ -494,16 +494,26 @@ fn ShareRow(
         let users = all_users.get();
         let groups = all_groups.get();
         if let Some(uid) = share_user_id {
-            users.iter().find(|u| u.id == uid)
+            users
+                .iter()
+                .find(|u| u.id == uid)
                 .map(|u| {
-                    let grp = u.group_id
-                        .and_then(|gid| groups.iter().find(|g| g.id == gid).map(|g| format!(" ({})", g.name)))
+                    let grp = u
+                        .group_id
+                        .and_then(|gid| {
+                            groups
+                                .iter()
+                                .find(|g| g.id == gid)
+                                .map(|g| format!(" ({})", g.name))
+                        })
                         .unwrap_or_default();
                     format!("{}{}", u.username, grp)
                 })
                 .unwrap_or_else(|| format!("User: {uid}"))
         } else if let Some(gid) = share_group_id {
-            groups.iter().find(|g| g.id == gid)
+            groups
+                .iter()
+                .find(|g| g.id == gid)
                 .map(|g| format!("Group: {}", g.name))
                 .unwrap_or_else(|| format!("Group: {gid}"))
         } else {

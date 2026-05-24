@@ -219,7 +219,13 @@ mod tests {
 
     fn make_collection(name: &str, owner_id: Uuid) -> Collection {
         use crate::domain::collection::slugify_code;
-        Collection::new(name.into(), slugify_code(name), None, owner_id, CollectionVisibility::Private)
+        Collection::new(
+            name.into(),
+            slugify_code(name),
+            None,
+            owner_id,
+            CollectionVisibility::Private,
+        )
     }
 
     fn make_endpoint(name: &str, collection_id: Uuid) -> Endpoint {

@@ -120,7 +120,13 @@ mod tests {
     use crate::domain::endpoint::{Endpoint, EndpointStatus, HttpMethod};
 
     fn make_collection(owner_id: Uuid) -> Collection {
-        Collection::new("C".into(), "c".into(), None, owner_id, CollectionVisibility::Public)
+        Collection::new(
+            "C".into(),
+            "c".into(),
+            None,
+            owner_id,
+            CollectionVisibility::Public,
+        )
     }
 
     fn make_endpoint(collection_id: Uuid, method: HttpMethod, path: &str) -> Endpoint {

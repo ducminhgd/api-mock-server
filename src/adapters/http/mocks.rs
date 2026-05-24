@@ -47,7 +47,12 @@ async fn handle_with_tail(
     dispatch(method, state, collection_code, &path).await
 }
 
-async fn dispatch(method: Method, state: AppState, collection_code: String, path: &str) -> Response {
+async fn dispatch(
+    method: Method,
+    state: AppState,
+    collection_code: String,
+    path: &str,
+) -> Response {
     let domain_method = match to_domain_method(&method) {
         Some(m) => m,
         None => {

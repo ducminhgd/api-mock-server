@@ -25,8 +25,8 @@ async fn main() {
     }
     let username = args[1].clone();
 
-    let password =
-        rpassword::prompt_password(format!("Password for '{username}': ")).unwrap_or_else(|e| {
+    let password = rpassword::prompt_password(format!("Password for '{username}': "))
+        .unwrap_or_else(|e| {
             eprintln!("Failed to read password: {e}");
             process::exit(1);
         });
@@ -36,11 +36,10 @@ async fn main() {
         process::exit(1);
     }
 
-    let confirm =
-        rpassword::prompt_password("Confirm password: ").unwrap_or_else(|e| {
-            eprintln!("Failed to read password: {e}");
-            process::exit(1);
-        });
+    let confirm = rpassword::prompt_password("Confirm password: ").unwrap_or_else(|e| {
+        eprintln!("Failed to read password: {e}");
+        process::exit(1);
+    });
 
     if password != confirm {
         eprintln!("Passwords do not match.");

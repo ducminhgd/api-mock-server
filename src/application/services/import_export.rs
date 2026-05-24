@@ -126,7 +126,13 @@ mod tests {
     }
 
     fn make_collection(owner_id: Uuid) -> Collection {
-        Collection::new("C".into(), "c".into(), None, owner_id, CollectionVisibility::Private)
+        Collection::new(
+            "C".into(),
+            "c".into(),
+            None,
+            owner_id,
+            CollectionVisibility::Private,
+        )
     }
 
     fn make_imported(name: &str, endpoints: Vec<ImportedEndpoint>) -> ImportedCollection {

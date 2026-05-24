@@ -162,9 +162,20 @@ fn bru_yaml_to_endpoint(content: &str) -> Option<ImportedEndpoint> {
         // Detect top-level section keys (no leading whitespace)
         if !raw.starts_with(' ') && !raw.starts_with('\t') {
             match raw {
-                "meta:" => { section = "meta"; continue; }
-                "http:" => { section = "http"; continue; }
-                _ => { if !raw.is_empty() { section = ""; } continue; }
+                "meta:" => {
+                    section = "meta";
+                    continue;
+                }
+                "http:" => {
+                    section = "http";
+                    continue;
+                }
+                _ => {
+                    if !raw.is_empty() {
+                        section = "";
+                    }
+                    continue;
+                }
             }
         }
 
@@ -204,7 +215,9 @@ fn yaml_unquote(s: &str) -> String {
     if s.starts_with('\'') && s.ends_with('\'') && s.len() >= 2 {
         s[1..s.len() - 1].replace("''", "'")
     } else if s.starts_with('"') && s.ends_with('"') && s.len() >= 2 {
-        s[1..s.len() - 1].replace("\\\"", "\"").replace("\\\\", "\\")
+        s[1..s.len() - 1]
+            .replace("\\\"", "\"")
+            .replace("\\\\", "\\")
     } else {
         s.to_string()
     }
@@ -507,13 +520,29 @@ mod tests {
     fn endpoint_to_bru_generates_yaml() {
         use crate::domain::collection::{Collection, CollectionVisibility};
         let owner = Uuid::new_v4();
-        let c = Collection::new("Test".into(), "test".into(), None, owner, CollectionVisibility::Private);
+        let c = Collection::new(
+            "Test".into(),
+            "test".into(),
+            None,
+            owner,
+            CollectionVisibility::Private,
+        );
         let ep = Endpoint::new(
-            c.id, "Get Users".into(), HttpMethod::Get, "/users".into(),
-            200, 0, None, None, None,
+            c.id,
+            "Get Users".into(),
+            HttpMethod::Get,
+            "/users".into(),
+            200,
+            0,
+            None,
+            None,
+            None,
         );
         let bru = endpoint_to_bru(c.id, &ep, 1);
-        assert!(bru.starts_with("meta:\n  name:"), "expected YAML format, got:\n{bru}");
+        assert!(
+            bru.starts_with("meta:\n  name:"),
+            "expected YAML format, got:\n{bru}"
+        );
         assert!(bru.contains("http:\n  method: get\n"));
         assert!(bru.contains("headers: []"));
     }
@@ -522,7 +551,13 @@ mod tests {
     fn serialize_zip_produces_non_empty_bytes() {
         use crate::domain::collection::{Collection, CollectionVisibility};
         let owner = Uuid::new_v4();
-        let c = Collection::new("Test".into(), "test".into(), None, owner, CollectionVisibility::Private);
+        let c = Collection::new(
+            "Test".into(),
+            "test".into(),
+            None,
+            owner,
+            CollectionVisibility::Private,
+        );
         let ep = Endpoint::new(
             c.id,
             "List".into(),

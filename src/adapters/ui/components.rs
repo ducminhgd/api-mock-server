@@ -106,7 +106,7 @@ pub fn Pagination(
                 {format!("Page {page} / {total_pages}")}
             </span>
             <button class="btn btn-secondary btn-sm"
-                disabled=move || !(page < total_pages)
+                disabled=move || (page >= total_pages)
                 on:click=on_next
             >"Next →"</button>
         </div>

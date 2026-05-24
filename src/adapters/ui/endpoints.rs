@@ -198,12 +198,18 @@ fn EndpointRow(
 
     let origin = {
         #[cfg(target_arch = "wasm32")]
-        { web_sys::window().and_then(|w| w.location().origin().ok()).unwrap_or_default() }
+        {
+            web_sys::window()
+                .and_then(|w| w.location().origin().ok())
+                .unwrap_or_default()
+        }
         #[cfg(not(target_arch = "wasm32"))]
-        { String::new() }
+        {
+            String::new()
+        }
     };
     let mock_path = format!("/mocks/{}{}", collection_code, ep.path);
-    let mock_url  = format!("{}{}", origin, mock_path);
+    let mock_url = format!("{}{}", origin, mock_path);
 
     let copied = RwSignal::new(false);
     let url_for_copy = mock_url.clone();
@@ -215,9 +221,7 @@ fn EndpointRow(
             leptos::task::spawn_local(async move {
                 if let Some(win) = web_sys::window() {
                     let clipboard = win.navigator().clipboard();
-                    let _ = wasm_bindgen_futures::JsFuture::from(
-                        clipboard.write_text(&url),
-                    ).await;
+                    let _ = wasm_bindgen_futures::JsFuture::from(clipboard.write_text(&url)).await;
                 }
                 copied.set(true);
                 // reset after 2 s via a JS-promise-based timer
@@ -353,9 +357,15 @@ fn EndpointForm(
     let ccode_for_hint = collection_code;
     let origin = {
         #[cfg(target_arch = "wasm32")]
-        { web_sys::window().and_then(|w| w.location().origin().ok()).unwrap_or_default() }
+        {
+            web_sys::window()
+                .and_then(|w| w.location().origin().ok())
+                .unwrap_or_default()
+        }
         #[cfg(not(target_arch = "wasm32"))]
-        { String::new() }
+        {
+            String::new()
+        }
     };
 
     let title = if is_edit {

@@ -110,7 +110,13 @@ impl CollectionService {
                 )));
             }
         }
-        collection.apply_update(req.name, req.code, req.description, req.status, req.visibility);
+        collection.apply_update(
+            req.name,
+            req.code,
+            req.description,
+            req.status,
+            req.visibility,
+        );
         self.collection_repo.save(&collection).await?;
         Ok(CollectionResponse::from(collection))
     }
@@ -134,7 +140,11 @@ impl CollectionService {
         if !self.has_access(&original, caller_id).await? {
             return Err(DomainError::Forbidden);
         }
-        let copy_code = format!("{}-{}", original.code, &uuid::Uuid::new_v4().to_string()[..8]);
+        let copy_code = format!(
+            "{}-{}",
+            original.code,
+            &uuid::Uuid::new_v4().to_string()[..8]
+        );
         let copy = Collection::new(
             format!("{} (copy)", original.name),
             copy_code,
@@ -307,7 +317,13 @@ mod tests {
     }
 
     fn make_collection(name: &str, owner_id: Uuid) -> Collection {
-        Collection::new(name.into(), slugify_code(name), None, owner_id, CollectionVisibility::Private)
+        Collection::new(
+            name.into(),
+            slugify_code(name),
+            None,
+            owner_id,
+            CollectionVisibility::Private,
+        )
     }
 
     fn no_filter() -> CollectionFilter {
