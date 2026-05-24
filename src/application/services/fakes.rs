@@ -99,6 +99,16 @@ impl CollectionRepository for FakeCollectionRepo {
             .ok_or(DomainError::CollectionNotFound(id))
     }
 
+    async fn find_by_code(&self, code: &str) -> Result<Collection, DomainError> {
+        self.store
+            .lock()
+            .unwrap()
+            .values()
+            .find(|c| c.code == code)
+            .cloned()
+            .ok_or_else(|| DomainError::InvalidInput(format!("collection code not found: {code}")))
+    }
+
     async fn save(&self, collection: &Collection) -> Result<(), DomainError> {
         self.store
             .lock()

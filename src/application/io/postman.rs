@@ -561,6 +561,7 @@ mod tests {
         let owner = Uuid::new_v4();
         let c = Collection::new(
             "Test API".into(),
+            "test-api".into(),
             None,
             owner,
             CollectionVisibility::Private,

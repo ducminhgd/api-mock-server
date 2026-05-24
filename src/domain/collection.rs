@@ -56,10 +56,28 @@ impl std::str::FromStr for CollectionVisibility {
     }
 }
 
+pub fn slugify_code(name: &str) -> String {
+    let s: String = name
+        .chars()
+        .map(|c| if c.is_alphanumeric() { c.to_ascii_lowercase() } else { '-' })
+        .collect();
+    let joined = s
+        .split('-')
+        .filter(|p| !p.is_empty())
+        .collect::<Vec<_>>()
+        .join("-");
+    if joined.is_empty() {
+        "collection".to_string()
+    } else {
+        joined.chars().take(32).collect()
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Collection {
     pub id: Uuid,
     pub name: String,
+    pub code: String,
     pub description: Option<String>,
     pub owner_id: Uuid,
     pub status: CollectionStatus,
@@ -71,6 +89,7 @@ pub struct Collection {
 impl Collection {
     pub fn new(
         name: String,
+        code: String,
         description: Option<String>,
         owner_id: Uuid,
         visibility: CollectionVisibility,
@@ -79,6 +98,7 @@ impl Collection {
         Self {
             id: Uuid::new_v4(),
             name,
+            code,
             description,
             owner_id,
             status: CollectionStatus::Active,
@@ -91,12 +111,16 @@ impl Collection {
     pub fn apply_update(
         &mut self,
         name: Option<String>,
+        code: Option<String>,
         description: Option<Option<String>>,
         status: Option<CollectionStatus>,
         visibility: Option<CollectionVisibility>,
     ) {
         if let Some(n) = name {
             self.name = n;
+        }
+        if let Some(c) = code {
+            self.code = c;
         }
         if let Some(d) = description {
             self.description = d;
@@ -128,6 +152,7 @@ mod tests {
     fn new_sets_active_status_and_private_visibility_by_default() {
         let c = Collection::new(
             "My API".into(),
+            "my-api".into(),
             None,
             owner(),
             CollectionVisibility::Private,
@@ -140,14 +165,14 @@ mod tests {
     #[test]
     fn new_assigns_unique_ids() {
         let oid = owner();
-        let a = Collection::new("A".into(), None, oid, CollectionVisibility::Private);
-        let b = Collection::new("A".into(), None, oid, CollectionVisibility::Private);
+        let a = Collection::new("A".into(), "a".into(), None, oid, CollectionVisibility::Private);
+        let b = Collection::new("A".into(), "a".into(), None, oid, CollectionVisibility::Private);
         assert_ne!(a.id, b.id);
     }
 
     #[test]
     fn new_stores_public_visibility() {
-        let c = Collection::new("Pub".into(), None, owner(), CollectionVisibility::Public);
+        let c = Collection::new("Pub".into(), "pub".into(), None, owner(), CollectionVisibility::Public);
         assert_eq!(c.visibility, CollectionVisibility::Public);
     }
 
@@ -155,6 +180,7 @@ mod tests {
     fn new_stores_description() {
         let c = Collection::new(
             "C".into(),
+            "c".into(),
             Some("desc".into()),
             owner(),
             CollectionVisibility::Private,
@@ -164,9 +190,9 @@ mod tests {
 
     #[test]
     fn apply_update_name_only() {
-        let mut c = Collection::new("Old".into(), None, owner(), CollectionVisibility::Private);
+        let mut c = Collection::new("Old".into(), "old".into(), None, owner(), CollectionVisibility::Private);
         let before = c.updated_at;
-        c.apply_update(Some("New".into()), None, None, None);
+        c.apply_update(Some("New".into()), None, None, None, None);
         assert_eq!(c.name, "New");
         assert!(c.description.is_none());
         assert_eq!(c.status, CollectionStatus::Active);
@@ -178,32 +204,33 @@ mod tests {
     fn apply_update_clears_description_with_some_none() {
         let mut c = Collection::new(
             "C".into(),
+            "c".into(),
             Some("desc".into()),
             owner(),
             CollectionVisibility::Private,
         );
-        c.apply_update(None, Some(None), None, None);
+        c.apply_update(None, None, Some(None), None, None);
         assert!(c.description.is_none());
     }
 
     #[test]
     fn apply_update_sets_description_with_some_some() {
-        let mut c = Collection::new("C".into(), None, owner(), CollectionVisibility::Private);
-        c.apply_update(None, Some(Some("new desc".into())), None, None);
+        let mut c = Collection::new("C".into(), "c".into(), None, owner(), CollectionVisibility::Private);
+        c.apply_update(None, None, Some(Some("new desc".into())), None, None);
         assert_eq!(c.description.as_deref(), Some("new desc"));
     }
 
     #[test]
     fn apply_update_status() {
-        let mut c = Collection::new("C".into(), None, owner(), CollectionVisibility::Private);
-        c.apply_update(None, None, Some(CollectionStatus::Inactive), None);
+        let mut c = Collection::new("C".into(), "c".into(), None, owner(), CollectionVisibility::Private);
+        c.apply_update(None, None, None, Some(CollectionStatus::Inactive), None);
         assert_eq!(c.status, CollectionStatus::Inactive);
     }
 
     #[test]
     fn apply_update_visibility() {
-        let mut c = Collection::new("C".into(), None, owner(), CollectionVisibility::Private);
-        c.apply_update(None, None, None, Some(CollectionVisibility::Public));
+        let mut c = Collection::new("C".into(), "c".into(), None, owner(), CollectionVisibility::Private);
+        c.apply_update(None, None, None, None, Some(CollectionVisibility::Public));
         assert_eq!(c.visibility, CollectionVisibility::Public);
     }
 
@@ -212,11 +239,12 @@ mod tests {
         let oid = owner();
         let mut c = Collection::new(
             "C".into(),
+            "c".into(),
             Some("d".into()),
             oid,
             CollectionVisibility::Public,
         );
-        c.apply_update(None, None, None, None);
+        c.apply_update(None, None, None, None, None);
         assert_eq!(c.name, "C");
         assert_eq!(c.description.as_deref(), Some("d"));
         assert_eq!(c.status, CollectionStatus::Active);
@@ -230,6 +258,7 @@ mod tests {
         let new_owner = owner();
         let mut c = Collection::new(
             "C".into(),
+            "c".into(),
             None,
             original_owner,
             CollectionVisibility::Private,
@@ -273,5 +302,19 @@ mod tests {
     fn collection_visibility_from_str_unknown_returns_err() {
         assert!("".parse::<CollectionVisibility>().is_err());
         assert!("shared".parse::<CollectionVisibility>().is_err());
+    }
+
+    #[test]
+    fn slugify_code_lowercases_and_hyphenates() {
+        assert_eq!(slugify_code("My API"), "my-api");
+        assert_eq!(slugify_code("Hello World!"), "hello-world");
+        assert_eq!(slugify_code("  "), "collection");
+        assert_eq!(slugify_code("abc"), "abc");
+    }
+
+    #[test]
+    fn slugify_code_truncates_at_32_chars() {
+        let long = "a".repeat(40);
+        assert_eq!(slugify_code(&long).len(), 32);
     }
 }

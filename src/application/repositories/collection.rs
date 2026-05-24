@@ -19,6 +19,8 @@ pub trait CollectionRepository: Send + Sync {
 
     async fn find_by_id(&self, id: Uuid) -> Result<Collection, DomainError>;
 
+    async fn find_by_code(&self, code: &str) -> Result<Collection, DomainError>;
+
     async fn save(&self, collection: &Collection) -> Result<(), DomainError>;
 
     async fn delete(&self, id: Uuid) -> Result<(), DomainError>;

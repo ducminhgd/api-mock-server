@@ -57,11 +57,13 @@ fn row_to_collection(row: &sqlx::any::AnyRow) -> Result<Collection, DomainError>
     let updated_at_str: String = row
         .try_get("updated_at")
         .map_err(|e| DomainError::Internal(e.to_string()))?;
+    let code: Option<String> = row.try_get("code").ok();
     Ok(Collection {
         id,
         name: row
             .try_get("name")
             .map_err(|e| DomainError::Internal(e.to_string()))?,
+        code: code.unwrap_or_else(|| id_str.clone()),
         description: row
             .try_get("description")
             .map_err(|e| DomainError::Internal(e.to_string()))?,
@@ -91,7 +93,7 @@ impl CollectionRepository for SqlxCollectionRepository {
         let offset = page.offset() as i64;
 
         let rows = sqlx::query(
-            "SELECT DISTINCT c.id, c.name, c.description, c.owner_id, c.status, c.visibility, \
+            "SELECT DISTINCT c.id, c.name, c.code, c.description, c.owner_id, c.status, c.visibility, \
                     CAST(c.created_at AS TEXT) as created_at, CAST(c.updated_at AS TEXT) as updated_at \
              FROM collections c \
              LEFT JOIN collection_shares cs ON cs.collection_id = c.id \
@@ -150,7 +152,7 @@ impl CollectionRepository for SqlxCollectionRepository {
     async fn find_by_id(&self, id: Uuid) -> Result<Collection, DomainError> {
         let id_str = id.to_string();
         let row = sqlx::query(
-            "SELECT id, name, description, owner_id, status, visibility, \
+            "SELECT id, name, code, description, owner_id, status, visibility, \
                     CAST(created_at AS TEXT) as created_at, CAST(updated_at AS TEXT) as updated_at \
              FROM collections WHERE id = ?",
         )
@@ -172,15 +174,16 @@ impl CollectionRepository for SqlxCollectionRepository {
         let updated_at = collection.updated_at.to_rfc3339();
         sqlx::query(
             "INSERT INTO collections \
-               (id, name, description, owner_id, status, visibility, created_at, updated_at) \
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?) \
+               (id, name, code, description, owner_id, status, visibility, created_at, updated_at) \
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) \
              ON CONFLICT(id) DO UPDATE SET \
-               name = excluded.name, description = excluded.description, \
+               name = excluded.name, code = excluded.code, description = excluded.description, \
                owner_id = excluded.owner_id, status = excluded.status, \
                visibility = excluded.visibility, updated_at = excluded.updated_at",
         )
         .bind(&id)
         .bind(&collection.name)
+        .bind(&collection.code)
         .bind(&collection.description)
         .bind(&owner_id)
         .bind(&status)
@@ -191,6 +194,20 @@ impl CollectionRepository for SqlxCollectionRepository {
         .await
         .map_err(|e| DomainError::Internal(e.to_string()))?;
         Ok(())
+    }
+
+    async fn find_by_code(&self, code: &str) -> Result<Collection, DomainError> {
+        let row = sqlx::query(
+            "SELECT id, name, code, description, owner_id, status, visibility, \
+                    CAST(created_at AS TEXT) as created_at, CAST(updated_at AS TEXT) as updated_at \
+             FROM collections WHERE code = ?",
+        )
+        .bind(code)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| DomainError::Internal(e.to_string()))?
+        .ok_or_else(|| DomainError::InvalidInput(format!("collection code not found: {code}")))?;
+        row_to_collection(&row)
     }
 
     async fn delete(&self, id: Uuid) -> Result<(), DomainError> {

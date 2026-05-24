@@ -19,9 +19,10 @@ enum Dialog {
 }
 
 #[component]
-pub fn EndpointList(collection_id: String) -> impl IntoView {
+pub fn EndpointList(collection_id: String, collection_code: String) -> impl IntoView {
     let auth = use_context::<AuthCtx>().expect("AuthCtx");
     let cid = StoredValue::new(collection_id);
+    let ccode = StoredValue::new(collection_code);
 
     let page = RwSignal::new(1u32);
     let search = RwSignal::new(String::new());
@@ -138,6 +139,7 @@ pub fn EndpointList(collection_id: String) -> impl IntoView {
                     Dialog::Create => view! {
                         <EndpointForm
                             collection_id=cid_v
+                            collection_code=ccode.get_value()
                             on_close=close
                             on_done=done
                         />
@@ -145,6 +147,7 @@ pub fn EndpointList(collection_id: String) -> impl IntoView {
                     Dialog::Edit(ep) => view! {
                         <EndpointForm
                             collection_id=cid_v
+                            collection_code=ccode.get_value()
                             endpoint=ep
                             on_close=close
                             on_done=done
@@ -213,6 +216,7 @@ fn EndpointRow(
 #[component]
 fn EndpointForm(
     collection_id: String,
+    collection_code: String,
     #[prop(optional)] endpoint: Option<EndpointResponse>,
     on_close: impl Fn() + Clone + Send + 'static,
     on_done: impl Fn() + Clone + Send + 'static,
@@ -268,7 +272,13 @@ fn EndpointForm(
     let pending = RwSignal::new(false);
     let eid = endpoint.as_ref().map(|e| e.id.to_string());
     let cid = collection_id;
-    let cid_for_hint = cid.clone();
+    let ccode_for_hint = collection_code;
+    let origin = {
+        #[cfg(target_arch = "wasm32")]
+        { web_sys::window().and_then(|w| w.location().origin().ok()).unwrap_or_default() }
+        #[cfg(not(target_arch = "wasm32"))]
+        { String::new() }
+    };
 
     let title = if is_edit {
         "Edit Endpoint"
@@ -399,7 +409,7 @@ fn EndpointForm(
                         />
                         <p class="form-hint">
                             {r#"Use {<param>} for path parameters. Mock URL: "#}
-                            <code>{move || format!("/mocks/{}{}", cid_for_hint, path.get())}</code>
+                            <code>{move || format!("{}/mocks/{}{}", origin, ccode_for_hint, path.get())}</code>
                         </p>
                     </div>
                     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.75rem">

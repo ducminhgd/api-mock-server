@@ -15,7 +15,7 @@ use crate::application::dto::collection_share::{CreateShareRequest, UpdateShareR
 use crate::application::dto::group::GroupResponse;
 use crate::application::dto::pagination::Paginated;
 use crate::application::dto::user::UserResponse;
-use crate::domain::collection::{CollectionStatus, CollectionVisibility};
+use crate::domain::collection::{slugify_code, CollectionStatus, CollectionVisibility};
 use crate::domain::collection_share::ShareRole;
 
 // ── Collections list ──────────────────────────────────────────────────────
@@ -102,6 +102,7 @@ pub fn CollectionsPage() -> impl IntoView {
                                     <thead>
                                         <tr>
                                             <th>"Name"</th>
+                                            <th>"Code"</th>
                                             <th>"Visibility"</th>
                                             <th>"Status"</th>
                                             <th>"Actions"</th>
@@ -188,6 +189,7 @@ fn CollectionRow(
                     <div class="text-muted text-sm">{d}</div>
                 })}
             </td>
+            <td><span class="mono text-sm">{col.code.clone()}</span></td>
             <td>
                 <span class=format!("badge badge-{vis}")>
                     {format!("{}", col.visibility)}
@@ -269,6 +271,7 @@ pub fn CollectionDetailPage() -> impl IntoView {
                         <div class="flex-gap" style="margin-bottom:1.25rem">
                             <span class=format!("badge badge-{vis}")>{format!("{}", c.visibility)}</span>
                             <StatusBadge status=format!("{}", c.status) />
+                            <span class="mono text-sm" style="color:var(--text-muted)">{c.code.clone()}</span>
                             {c.description.map(|d| view! { <span class="text-muted text-sm">{d}</span> })}
                         </div>
                     }.into_any()
@@ -288,13 +291,19 @@ pub fn CollectionDetailPage() -> impl IntoView {
                 >"Sharing"</button>
             </div>
 
-            {move || match tab.get() {
+            {move || {
+                let code = collection_data.get()
+                    .and_then(|r| r.ok())
+                    .map(|c| c.code)
+                    .unwrap_or_else(|| coll_id.get());
+                match tab.get() {
                 DetailTab::Endpoints => view! {
-                    <EndpointList collection_id=coll_id.get() />
+                    <EndpointList collection_id=coll_id.get() collection_code=code />
                 }.into_any(),
                 DetailTab::Shares => view! {
                     <SharesPanel collection_id=coll_id.get() />
                 }.into_any(),
+            }
             }}
 
             {move || show_edit.get().then(|| {
@@ -571,6 +580,8 @@ fn CollectionForm(
     let is_edit = col.is_some();
 
     let name = RwSignal::new(col.as_ref().map(|c| c.name.clone()).unwrap_or_default());
+    let code = RwSignal::new(col.as_ref().map(|c| c.code.clone()).unwrap_or_default());
+    let code_manual = RwSignal::new(is_edit); // edit mode: don't auto-fill
     let description = RwSignal::new(
         col.as_ref()
             .and_then(|c| c.description.clone())
@@ -608,6 +619,8 @@ fn CollectionForm(
         pending.set(true);
 
         let token = auth.token_str();
+        let c = code.get();
+        let code_val = if c.is_empty() { None } else { Some(c) };
         let desc = description.get();
         let desc_val = if desc.is_empty() { None } else { Some(desc) };
         let vis = visibility.get();
@@ -630,6 +643,7 @@ fn CollectionForm(
                     &id,
                     UpdateCollectionRequest {
                         name: Some(n),
+                        code: code_val,
                         description: Some(desc_val),
                         status: stat_parsed,
                         visibility: Some(vis_parsed),
@@ -642,6 +656,7 @@ fn CollectionForm(
                     &token,
                     CreateCollectionRequest {
                         name: n,
+                        code: code_val,
                         description: desc_val,
                         visibility: Some(vis_parsed),
                     },
@@ -669,8 +684,25 @@ fn CollectionForm(
                         <label class="form-label">"Name"</label>
                         <input type="text" required
                             prop:value=move || name.get()
-                            on:input=move |ev| name.set(event_target_value(&ev))
+                            on:input=move |ev| {
+                                let v = event_target_value(&ev);
+                                if !code_manual.get() {
+                                    code.set(slugify_code(&v));
+                                }
+                                name.set(v);
+                            }
                         />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">"Code"</label>
+                        <input type="text" required placeholder="my-api"
+                            prop:value=move || code.get()
+                            on:input=move |ev| {
+                                code_manual.set(true);
+                                code.set(event_target_value(&ev));
+                            }
+                        />
+                        <p class="form-hint">"Unique identifier used in mock URLs: /mocks/{code}/…"</p>
                     </div>
                     <div class="form-group">
                         <label class="form-label">"Description (optional)"</label>

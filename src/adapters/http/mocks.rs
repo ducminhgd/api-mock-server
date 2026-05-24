@@ -6,7 +6,6 @@ use axum::http::{header, HeaderName, HeaderValue, Method, StatusCode};
 use axum::response::{IntoResponse, Response};
 use axum::routing::any;
 use axum::{body::Body, Router};
-use uuid::Uuid;
 
 use crate::application::services::mocks::MockError;
 use crate::domain::endpoint::HttpMethod;
@@ -14,8 +13,8 @@ use crate::infrastructure::state::AppState;
 
 pub fn router() -> Router<AppState> {
     Router::new()
-        .route("/:collection_id", any(handle_root))
-        .route("/:collection_id/*tail", any(handle_with_tail))
+        .route("/:collection_code", any(handle_root))
+        .route("/:collection_code/*tail", any(handle_with_tail))
 }
 
 fn to_domain_method(m: &Method) -> Option<HttpMethod> {
@@ -34,21 +33,21 @@ fn to_domain_method(m: &Method) -> Option<HttpMethod> {
 async fn handle_root(
     method: Method,
     State(state): State<AppState>,
-    Path(collection_id): Path<Uuid>,
+    Path(collection_code): Path<String>,
 ) -> Response {
-    dispatch(method, state, collection_id, "/").await
+    dispatch(method, state, collection_code, "/").await
 }
 
 async fn handle_with_tail(
     method: Method,
     State(state): State<AppState>,
-    Path((collection_id, tail)): Path<(Uuid, String)>,
+    Path((collection_code, tail)): Path<(String, String)>,
 ) -> Response {
     let path = format!("/{tail}");
-    dispatch(method, state, collection_id, &path).await
+    dispatch(method, state, collection_code, &path).await
 }
 
-async fn dispatch(method: Method, state: AppState, collection_id: Uuid, path: &str) -> Response {
+async fn dispatch(method: Method, state: AppState, collection_code: String, path: &str) -> Response {
     let domain_method = match to_domain_method(&method) {
         Some(m) => m,
         None => {
@@ -58,7 +57,7 @@ async fn dispatch(method: Method, state: AppState, collection_id: Uuid, path: &s
 
     match state
         .mocks
-        .resolve(collection_id, domain_method, path)
+        .resolve_by_code(&collection_code, domain_method, path)
         .await
     {
         Err(MockError::CollectionNotFound) => {

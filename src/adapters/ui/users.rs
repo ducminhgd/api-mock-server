@@ -32,6 +32,9 @@ pub fn UsersPage() -> impl IntoView {
     let token_signal = auth.token; // Copy — keep for Effect, on_reset, and delete handlers
     let on_reset_token = auth.token; // Copy — for on_reset inline closure
 
+    let all_groups = RwSignal::new(Vec::<GroupResponse>::new());
+    let groups_token = auth.token;
+
     Effect::new(move |_| {
         let token = token_signal.get().unwrap_or_default();
         let pg = page.get();
@@ -41,6 +44,15 @@ pub fn UsersPage() -> impl IntoView {
         leptos::task::spawn_local(async move {
             let r = api::list_users(&token, pg, if s.is_empty() { None } else { Some(s) }).await;
             users_data.set(Some(r));
+        });
+    });
+
+    Effect::new(move |_| {
+        let token = groups_token.get().unwrap_or_default();
+        leptos::task::spawn_local(async move {
+            if let Ok(gs) = api::list_groups_all(&token).await {
+                all_groups.set(gs);
+            }
         });
     });
 
@@ -90,6 +102,7 @@ pub fn UsersPage() -> impl IntoView {
                                     <thead>
                                         <tr>
                                             <th>"Username"</th>
+                                            <th>"Group"</th>
                                             <th>"Role"</th>
                                             <th>"Status"</th>
                                             <th>"Actions"</th>
@@ -103,6 +116,7 @@ pub fn UsersPage() -> impl IntoView {
                                         >
                                             <UserRow
                                                 user=u.clone()
+                                                all_groups=all_groups
                                                 on_edit=move |u| dialog.set(Some(Dialog::Edit(u)))
                                                 on_delete=move |u| dialog.set(Some(Dialog::Delete(u)))
                                                 on_reset={
@@ -190,6 +204,7 @@ pub fn UsersPage() -> impl IntoView {
 #[component]
 fn UserRow(
     user: UserResponse,
+    all_groups: RwSignal<Vec<GroupResponse>>,
     on_edit: impl Fn(UserResponse) + 'static,
     on_delete: impl Fn(UserResponse) + 'static,
     on_reset: impl Fn(UserResponse) + 'static,
@@ -197,9 +212,22 @@ fn UserRow(
     let u_edit = user.clone();
     let u_del = user.clone();
     let u_reset = user.clone();
+    let gid = user.group_id;
+    let group_name = move || {
+        if let Some(gid) = gid {
+            all_groups.get()
+                .into_iter()
+                .find(|g| g.id == gid)
+                .map(|g| g.name)
+                .unwrap_or_else(|| "—".into())
+        } else {
+            "—".into()
+        }
+    };
     view! {
         <tr>
             <td><span class="mono">{user.username.clone()}</span></td>
+            <td class="text-muted text-sm">{group_name}</td>
             <td><span class=format!("badge badge-{}", format!("{}", user.role).to_lowercase())>
                 {format!("{}", user.role)}
             </span></td>

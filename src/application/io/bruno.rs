@@ -507,7 +507,7 @@ mod tests {
     fn endpoint_to_bru_generates_yaml() {
         use crate::domain::collection::{Collection, CollectionVisibility};
         let owner = Uuid::new_v4();
-        let c = Collection::new("Test".into(), None, owner, CollectionVisibility::Private);
+        let c = Collection::new("Test".into(), "test".into(), None, owner, CollectionVisibility::Private);
         let ep = Endpoint::new(
             c.id, "Get Users".into(), HttpMethod::Get, "/users".into(),
             200, 0, None, None, None,
@@ -522,7 +522,7 @@ mod tests {
     fn serialize_zip_produces_non_empty_bytes() {
         use crate::domain::collection::{Collection, CollectionVisibility};
         let owner = Uuid::new_v4();
-        let c = Collection::new("Test".into(), None, owner, CollectionVisibility::Private);
+        let c = Collection::new("Test".into(), "test".into(), None, owner, CollectionVisibility::Private);
         let ep = Endpoint::new(
             c.id,
             "List".into(),
@@ -544,6 +544,7 @@ mod tests {
         let owner = Uuid::new_v4();
         let c = Collection::new(
             "Round Trip".into(),
+            "round-trip".into(),
             None,
             owner,
             CollectionVisibility::Private,

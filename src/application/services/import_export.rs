@@ -5,7 +5,7 @@ use crate::application::io::ImportedCollection;
 use crate::application::repositories::collection::CollectionRepository;
 use crate::application::repositories::collection_share::CollectionShareRepository;
 use crate::application::repositories::endpoint::EndpointRepository;
-use crate::domain::collection::{Collection, CollectionVisibility};
+use crate::domain::collection::{slugify_code, Collection, CollectionVisibility};
 use crate::domain::endpoint::Endpoint;
 use crate::domain::errors::DomainError;
 
@@ -39,8 +39,10 @@ impl ImportExportService {
             ));
         }
 
+        let code = slugify_code(&imported.name);
         let collection = Collection::new(
             imported.name,
+            code,
             imported.description,
             owner_id,
             CollectionVisibility::Private,
@@ -124,7 +126,7 @@ mod tests {
     }
 
     fn make_collection(owner_id: Uuid) -> Collection {
-        Collection::new("C".into(), None, owner_id, CollectionVisibility::Private)
+        Collection::new("C".into(), "c".into(), None, owner_id, CollectionVisibility::Private)
     }
 
     fn make_imported(name: &str, endpoints: Vec<ImportedEndpoint>) -> ImportedCollection {

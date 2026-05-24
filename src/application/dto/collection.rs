@@ -8,6 +8,7 @@ use crate::domain::collection::{Collection, CollectionStatus, CollectionVisibili
 pub struct CollectionResponse {
     pub id: Uuid,
     pub name: String,
+    pub code: String,
     pub description: Option<String>,
     pub owner_id: Uuid,
     pub status: CollectionStatus,
@@ -21,6 +22,7 @@ impl From<Collection> for CollectionResponse {
         Self {
             id: c.id,
             name: c.name,
+            code: c.code,
             description: c.description,
             owner_id: c.owner_id,
             status: c.status,
@@ -34,6 +36,7 @@ impl From<Collection> for CollectionResponse {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreateCollectionRequest {
     pub name: String,
+    pub code: Option<String>,
     pub description: Option<String>,
     pub visibility: Option<CollectionVisibility>,
 }
@@ -41,6 +44,7 @@ pub struct CreateCollectionRequest {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UpdateCollectionRequest {
     pub name: Option<String>,
+    pub code: Option<String>,
     /// `Some(None)` clears the description; `None` leaves it unchanged.
     pub description: Option<Option<String>>,
     pub status: Option<CollectionStatus>,

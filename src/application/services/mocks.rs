@@ -5,6 +5,7 @@ use crate::application::repositories::collection::CollectionRepository;
 use crate::application::repositories::endpoint::EndpointRepository;
 use crate::domain::collection::CollectionStatus;
 use crate::domain::endpoint::{EndpointStatus, HttpMethod};
+use crate::domain::errors::DomainError;
 use crate::domain::mock::{resolve_endpoint, MockResolution};
 
 #[derive(Debug)]
@@ -41,7 +42,33 @@ impl MockService {
         }
     }
 
+    pub async fn resolve_by_code(
+        &self,
+        collection_code: &str,
+        method: HttpMethod,
+        path: &str,
+    ) -> Result<MockResult, MockError> {
+        let collection = self
+            .collection_repo
+            .find_by_code(collection_code)
+            .await
+            .map_err(|e| match e {
+                DomainError::InvalidInput(_) => MockError::CollectionNotFound,
+                _ => MockError::CollectionNotFound,
+            })?;
+        self.resolve_collection(collection.id, method, path).await
+    }
+
     pub async fn resolve(
+        &self,
+        collection_id: Uuid,
+        method: HttpMethod,
+        path: &str,
+    ) -> Result<MockResult, MockError> {
+        self.resolve_collection(collection_id, method, path).await
+    }
+
+    async fn resolve_collection(
         &self,
         collection_id: Uuid,
         method: HttpMethod,
@@ -93,7 +120,7 @@ mod tests {
     use crate::domain::endpoint::{Endpoint, EndpointStatus, HttpMethod};
 
     fn make_collection(owner_id: Uuid) -> Collection {
-        Collection::new("C".into(), None, owner_id, CollectionVisibility::Public)
+        Collection::new("C".into(), "c".into(), None, owner_id, CollectionVisibility::Public)
     }
 
     fn make_endpoint(collection_id: Uuid, method: HttpMethod, path: &str) -> Endpoint {

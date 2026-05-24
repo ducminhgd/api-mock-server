@@ -13,7 +13,7 @@ use crate::application::repositories::collection::CollectionRepository;
 use crate::application::repositories::collection_share::CollectionShareRepository;
 use crate::application::repositories::endpoint::EndpointRepository;
 use crate::application::repositories::user::UserRepository;
-use crate::domain::collection::{Collection, CollectionVisibility};
+use crate::domain::collection::{slugify_code, Collection, CollectionVisibility};
 use crate::domain::collection_share::CollectionShare;
 use crate::domain::errors::DomainError;
 
@@ -75,7 +75,17 @@ impl CollectionService {
         req: CreateCollectionRequest,
     ) -> Result<CollectionResponse, DomainError> {
         let visibility = req.visibility.unwrap_or(CollectionVisibility::Private);
-        let collection = Collection::new(req.name, req.description, caller_id, visibility);
+        let code = req
+            .code
+            .filter(|c| !c.is_empty())
+            .unwrap_or_else(|| slugify_code(&req.name));
+        if self.collection_repo.find_by_code(&code).await.is_ok() {
+            return Err(DomainError::Conflict(format!(
+                "collection code '{}' is already in use",
+                code
+            )));
+        }
+        let collection = Collection::new(req.name, code, req.description, caller_id, visibility);
         self.collection_repo.save(&collection).await?;
         Ok(CollectionResponse::from(collection))
     }
@@ -90,7 +100,17 @@ impl CollectionService {
         if !Self::is_owner(&collection, caller_id) {
             return Err(DomainError::Forbidden);
         }
-        collection.apply_update(req.name, req.description, req.status, req.visibility);
+        if let Some(ref new_code) = req.code {
+            if new_code != &collection.code
+                && self.collection_repo.find_by_code(new_code).await.is_ok()
+            {
+                return Err(DomainError::Conflict(format!(
+                    "collection code '{}' is already in use",
+                    new_code
+                )));
+            }
+        }
+        collection.apply_update(req.name, req.code, req.description, req.status, req.visibility);
         self.collection_repo.save(&collection).await?;
         Ok(CollectionResponse::from(collection))
     }
@@ -114,8 +134,10 @@ impl CollectionService {
         if !self.has_access(&original, caller_id).await? {
             return Err(DomainError::Forbidden);
         }
+        let copy_code = format!("{}-{}", original.code, &uuid::Uuid::new_v4().to_string()[..8]);
         let copy = Collection::new(
             format!("{} (copy)", original.name),
+            copy_code,
             original.description,
             caller_id,
             original.visibility,
@@ -285,7 +307,7 @@ mod tests {
     }
 
     fn make_collection(name: &str, owner_id: Uuid) -> Collection {
-        Collection::new(name.into(), None, owner_id, CollectionVisibility::Private)
+        Collection::new(name.into(), slugify_code(name), None, owner_id, CollectionVisibility::Private)
     }
 
     fn no_filter() -> CollectionFilter {
@@ -403,6 +425,7 @@ mod tests {
         let owner_id = owner.id;
         let public = Collection::new(
             "Public".into(),
+            "public".into(),
             None,
             owner_id,
             CollectionVisibility::Public,
@@ -508,6 +531,7 @@ mod tests {
                 caller_id,
                 CreateCollectionRequest {
                     name: "New".into(),
+                    code: None,
                     description: None,
                     visibility: None,
                 },
@@ -527,6 +551,7 @@ mod tests {
                 caller_id,
                 CreateCollectionRequest {
                     name: "C".into(),
+                    code: None,
                     description: None,
                     visibility: None,
                 },
@@ -545,6 +570,7 @@ mod tests {
                 caller_id,
                 CreateCollectionRequest {
                     name: "C".into(),
+                    code: None,
                     description: None,
                     visibility: Some(CollectionVisibility::Public),
                 },
@@ -563,6 +589,7 @@ mod tests {
                 caller_id,
                 CreateCollectionRequest {
                     name: "C".into(),
+                    code: None,
                     description: Some("My description".into()),
                     visibility: None,
                 },
@@ -587,6 +614,7 @@ mod tests {
                 caller_id,
                 UpdateCollectionRequest {
                     name: Some("New".into()),
+                    code: None,
                     description: None,
                     status: None,
                     visibility: None,
@@ -615,6 +643,7 @@ mod tests {
                 stranger_id,
                 UpdateCollectionRequest {
                     name: Some("X".into()),
+                    code: None,
                     description: None,
                     status: None,
                     visibility: None,
@@ -635,6 +664,7 @@ mod tests {
                 caller_id,
                 UpdateCollectionRequest {
                     name: None,
+                    code: None,
                     description: None,
                     status: None,
                     visibility: None,
