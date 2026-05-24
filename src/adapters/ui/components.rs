@@ -85,7 +85,7 @@ pub fn Pagination(
             }
         }
     };
-    let on_next = {
+    let _on_next = {
         let on_page = on_page.clone();
         move |_: leptos::ev::MouseEvent| {
             if page < total_pages {
