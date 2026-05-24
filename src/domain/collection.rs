@@ -56,20 +56,36 @@ impl std::str::FromStr for CollectionVisibility {
     }
 }
 
+/// Derives a Jira-style project key from a collection name.
+/// Multi-word names produce an acronym (first letter of each word).
+/// Single-word names use the first 10 characters.
+/// Result is uppercase, letters and digits only, starts with a letter, max 10 chars.
 pub fn slugify_code(name: &str) -> String {
-    let s: String = name
-        .chars()
-        .map(|c| if c.is_alphanumeric() { c.to_ascii_lowercase() } else { '-' })
+    let words: Vec<String> = name
+        .split(|c: char| !c.is_alphanumeric())
+        .filter(|w| !w.is_empty())
+        .map(|w| w.to_uppercase())
         .collect();
-    let joined = s
-        .split('-')
-        .filter(|p| !p.is_empty())
-        .collect::<Vec<_>>()
-        .join("-");
-    if joined.is_empty() {
-        "collection".to_string()
+
+    let raw: String = if words.len() > 1 {
+        words.iter().filter_map(|w| w.chars().next()).collect()
+    } else if let Some(word) = words.first() {
+        word.chars().skip_while(|c| c.is_ascii_digit()).take(3).collect()
     } else {
-        joined.chars().take(32).collect()
+        String::new()
+    };
+
+    // Keep only ASCII letters and digits; strip any leading digits so it starts with a letter.
+    let cleaned: String = raw
+        .chars()
+        .filter(|c| c.is_ascii_uppercase() || c.is_ascii_digit())
+        .skip_while(|c| c.is_ascii_digit())
+        .collect();
+
+    if cleaned.is_empty() {
+        "C".to_string()
+    } else {
+        cleaned.chars().take(10).collect()
     }
 }
 
@@ -305,16 +321,43 @@ mod tests {
     }
 
     #[test]
-    fn slugify_code_lowercases_and_hyphenates() {
-        assert_eq!(slugify_code("My API"), "my-api");
-        assert_eq!(slugify_code("Hello World!"), "hello-world");
-        assert_eq!(slugify_code("  "), "collection");
-        assert_eq!(slugify_code("abc"), "abc");
+    fn slugify_code_multi_word_produces_acronym() {
+        assert_eq!(slugify_code("My API"), "MA");
+        assert_eq!(slugify_code("Hello World!"), "HW");
+        assert_eq!(slugify_code("API Mock Server"), "AMS");
+        assert_eq!(slugify_code("my-api"), "MA");
     }
 
     #[test]
-    fn slugify_code_truncates_at_32_chars() {
+    fn slugify_code_single_word_takes_up_to_3_chars() {
+        assert_eq!(slugify_code("abc"), "ABC");
+        assert_eq!(slugify_code("development"), "DEV");
+        assert_eq!(slugify_code("AB"), "AB");
+        assert_eq!(slugify_code("A"), "A");
+    }
+
+    #[test]
+    fn slugify_code_blank_returns_fallback() {
+        assert_eq!(slugify_code("  "), "C");
+        assert_eq!(slugify_code("!!!"), "C");
+    }
+
+    #[test]
+    fn slugify_code_strips_leading_digits() {
+        assert_eq!(slugify_code("123project"), "PRO");
+        assert_eq!(slugify_code("1"), "C");
+    }
+
+    #[test]
+    fn slugify_code_single_word_truncates_at_3_chars() {
         let long = "a".repeat(40);
-        assert_eq!(slugify_code(&long).len(), 32);
+        assert_eq!(slugify_code(&long).len(), 3);
+    }
+
+    #[test]
+    fn slugify_code_multi_word_acronym_truncates_at_10_chars() {
+        // 11 single-char words → acronym of 11 chars → truncated to 10
+        let long_name = "a b c d e f g h i j k";
+        assert_eq!(slugify_code(long_name).len(), 10);
     }
 }

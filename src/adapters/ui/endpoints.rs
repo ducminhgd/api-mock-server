@@ -100,6 +100,7 @@ pub fn EndpointList(collection_id: String, collection_code: String) -> impl Into
                                             <th>"Method"</th>
                                             <th>"Path"</th>
                                             <th>"Name"</th>
+                                            <th>"Mock URL"</th>
                                             <th>"Status"</th>
                                             <th>"Delay"</th>
                                             <th>"Actions"</th>
@@ -113,6 +114,7 @@ pub fn EndpointList(collection_id: String, collection_code: String) -> impl Into
                                         >
                                             <EndpointRow
                                                 ep=ep.clone()
+                                                collection_code=ccode.get_value()
                                                 on_edit=move |e| dialog.set(Some(Dialog::Edit(e)))
                                                 on_delete=move |e| dialog.set(Some(Dialog::Delete(e)))
                                             />
@@ -182,6 +184,7 @@ pub fn EndpointList(collection_id: String, collection_code: String) -> impl Into
 #[component]
 fn EndpointRow(
     ep: EndpointResponse,
+    collection_code: String,
     on_edit: impl Fn(EndpointResponse) + 'static,
     on_delete: impl Fn(EndpointResponse) + 'static,
 ) -> impl IntoView {
@@ -192,11 +195,86 @@ fn EndpointRow(
     } else {
         "-".into()
     };
+
+    let origin = {
+        #[cfg(target_arch = "wasm32")]
+        { web_sys::window().and_then(|w| w.location().origin().ok()).unwrap_or_default() }
+        #[cfg(not(target_arch = "wasm32"))]
+        { String::new() }
+    };
+    let mock_path = format!("/mocks/{}{}", collection_code, ep.path);
+    let mock_url  = format!("{}{}", origin, mock_path);
+
+    let copied = RwSignal::new(false);
+    let url_for_copy = mock_url.clone();
+
+    let on_copy = move |_| {
+        let url = url_for_copy.clone();
+        #[cfg(target_arch = "wasm32")]
+        {
+            leptos::task::spawn_local(async move {
+                if let Some(win) = web_sys::window() {
+                    let clipboard = win.navigator().clipboard();
+                    let _ = wasm_bindgen_futures::JsFuture::from(
+                        clipboard.write_text(&url),
+                    ).await;
+                }
+                copied.set(true);
+                // reset after 2 s via a JS-promise-based timer
+                let promise = js_sys::Promise::new(&mut |resolve, _| {
+                    let _ = web_sys::window()
+                        .unwrap()
+                        .set_timeout_with_callback_and_timeout_and_arguments_0(&resolve, 2000);
+                });
+                let _ = wasm_bindgen_futures::JsFuture::from(promise).await;
+                copied.set(false);
+            });
+        }
+        #[cfg(not(target_arch = "wasm32"))]
+        let _ = url;
+    };
+
     view! {
         <tr>
             <td><MethodBadge method=format!("{}", ep.method) /></td>
             <td><span class="mono text-sm">{ep.path.clone()}</span></td>
             <td>{ep.name.clone()}</td>
+            <td>
+                <div class="mock-url-cell">
+                    <a href=mock_url.clone() target="_blank" rel="noopener noreferrer"
+                        class="mono text-sm mock-url-link"
+                        title=mock_url.clone()
+                    >
+                        {mock_path}
+                    </a>
+                    <button
+                        class="btn-icon"
+                        title="Copy URL"
+                        on:click=on_copy
+                    >
+                        {move || if copied.get() {
+                            view! {
+                                // checkmark
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+                                    stroke="currentColor" stroke-width="2.5"
+                                    stroke-linecap="round" stroke-linejoin="round">
+                                    <polyline points="20 6 9 17 4 12"/>
+                                </svg>
+                            }.into_any()
+                        } else {
+                            view! {
+                                // clipboard
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+                                    stroke="currentColor" stroke-width="2"
+                                    stroke-linecap="round" stroke-linejoin="round">
+                                    <rect x="9" y="2" width="13" height="13" rx="2" ry="2"/>
+                                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                                </svg>
+                            }.into_any()
+                        }}
+                    </button>
+                </div>
+            </td>
             <td><StatusBadge status=format!("{}", ep.status) /></td>
             <td class="text-muted text-sm">{delay}</td>
             <td>
