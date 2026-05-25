@@ -33,7 +33,7 @@ RUN useradd -m -u 1000 appuser
 WORKDIR /app
 
 COPY --from=builder --chown=appuser:appuser /app/target/release/api-mock-server ./server
-COPY --from=builder --chown=appuser:appuser /app/target/site ./site
+COPY --from=builder --chown=appuser:appuser /app/site ./site
 
 RUN mkdir -p /app/data && chown appuser:appuser /app/data
 
