@@ -22,22 +22,33 @@ COPY . .
 
 RUN cargo leptos build --release
 
+# ── extract runtime libs beyond what glibc-dynamic provides ──────────────────
+# ldd finds all deps; we filter out glibc/libgcc (already in chainguard base)
+# and copy the rest (currently just liblzma) in an arch-agnostic way.
+FROM builder AS runtime-libs
+RUN mkdir -p /extra-libs \
+    && ldd /app/target/release/api-mock-server \
+       | grep "=> /" \
+       | awk '{print $3}' \
+       | grep -Ev '/(libc|libm|libgcc_s|libpthread|libdl|librt)\.so' \
+       | xargs -I{} sh -c 'cp -L {} /extra-libs/$(basename {})'
+
+# ── pre-create data dir owned by chainguard nonroot uid 65532 ─────────────────
+FROM builder AS data-dir
+RUN mkdir -p /app/data && touch /app/data/.keep
+
 # ── prod ──────────────────────────────────────────────────────────────────────
-FROM debian:bookworm-slim AS prod
+# chainguard/glibc-dynamic: distroless, no shell, glibc + libgcc + ca-certs
+FROM cgr.dev/chainguard/glibc-dynamic:latest AS prod
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-        libssl3 ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
+# Extra runtime libraries the binary needs (liblzma)
+COPY --from=runtime-libs /extra-libs/ /usr/lib/
 
-RUN useradd -m -u 1000 appuser
 WORKDIR /app
 
-COPY --from=builder --chown=appuser:appuser /app/target/release/api-mock-server ./server
-COPY --from=builder --chown=appuser:appuser /app/site ./site
-
-RUN mkdir -p /app/data && chown appuser:appuser /app/data
-
-USER appuser
+COPY --from=builder --chown=65532:65532 /app/target/release/api-mock-server ./server
+COPY --from=builder --chown=65532:65532 /app/site ./site
+COPY --from=data-dir --chown=65532:65532 /app/data ./data
 
 ENV LEPTOS_SITE_ROOT=/app/site
 ENV DATABASE_URL=sqlite:///app/data/app.db
