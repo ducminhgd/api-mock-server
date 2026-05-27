@@ -1,4 +1,4 @@
-.PHONY: dev build test migrate migrate-revert lint pre-commit setup check create-admin
+.PHONY: install dev build test migrate migrate-revert lint pre-commit setup check create-admin
 
 # Load .env if it exists
 ifneq (,$(wildcard .env))
@@ -8,6 +8,12 @@ endif
 
 DATABASE_URL ?= sqlite://./dev.db
 JWT_SECRET   ?= dev-secret
+
+install:
+	cargo update
+	cargo install cargo-leptos --version 0.3.6 --locked
+	cargo install sqlx-cli --no-default-features --features sqlite --locked
+	cargo install cargo-watch --locked
 
 dev:
 	DATABASE_URL=$(DATABASE_URL) JWT_SECRET=$(JWT_SECRET) cargo leptos watch
