@@ -949,7 +949,7 @@ async fn upload_import(token: String, filename: String, bytes: Vec<u8>) -> Resul
         } else {
             format!("Import failed: {msg}")
         };
-        return Err(detail);
+        Err(detail)
     }
     #[cfg(not(target_arch = "wasm32"))]
     Ok(())
