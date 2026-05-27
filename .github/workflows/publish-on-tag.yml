@@ -1,63 +1,52 @@
 name: Publish Docker image on tag
 
 on:
-  create:
-    tags: true
+  push:
+    tags:
+      - "v*"
+
 
 permissions:
   contents: read
   packages: write
 
 env:
-  IMAGE_NAME: api-mock-server
+  IMAGE_NAME: ${{ secrets.DOCKERHUB_USERNAME }}/api-mock-server
 
 jobs:
-  build-and-push:
+  docker:
     runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+
     steps:
-      - name: Checkout repository
+      - name: Checkout source
         uses: actions/checkout@v4
 
-      - name: Determine image name and tag
-        run: |
-          TAG=${GITHUB_REF#refs/tags/}
-          if [ -n "${{ secrets.DOCKER_USERNAME }}" ] && [ -n "${{ secrets.DOCKER_PASSWORD }}" ]; then
-            echo "REGISTRY=docker.io" >> $GITHUB_ENV
-            echo "IMAGE=${{ secrets.DOCKER_USERNAME }}/api-mock-server:${TAG}" >> $GITHUB_ENV
-            echo "LOGIN_REGISTRY=docker.io" >> $GITHUB_ENV
-          else
-            echo "REGISTRY=ghcr.io" >> $GITHUB_ENV
-            echo "IMAGE=ghcr.io/${{ github.repository_owner }}/api-mock-server:${TAG}" >> $GITHUB_ENV
-            echo "LOGIN_REGISTRY=ghcr.io" >> $GITHUB_ENV
-          fi
-          echo "TAG=${TAG}" >> $GITHUB_ENV
-
-      - name: Set up QEMU (for multi-platform builds)
-        uses: docker/setup-qemu-action@v2
-
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
+        uses: docker/setup-buildx-action@v3
 
       - name: Login to Docker Hub
-        if: ${{ secrets.DOCKER_USERNAME && secrets.DOCKER_PASSWORD }}
-        uses: docker/login-action@v2
+        uses: docker/login-action@v3
         with:
-          registry: docker.io
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Login to GitHub Container Registry
-        if: ${{ !(secrets.DOCKER_USERNAME && secrets.DOCKER_PASSWORD) }}
-        uses: docker/login-action@v2
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
         with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          images: ${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=tag
 
       - name: Build and push Docker image
-        uses: docker/build-push-action@v4
+        uses: docker/build-push-action@v6
         with:
           context: .
           push: true
-          tags: ${{ env.IMAGE }}
-          platforms: linux/amd64,linux/arm64
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
