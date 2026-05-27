@@ -58,7 +58,7 @@ chrono = { version = "0.4", features = ["serde"] }
 wasm-bindgen = "0.2"
 cargo-leptos = "0.3.6"
 rhai_codegen = "3.2.0"
-rhai = "1.25.0"
+rhai = "1.24"
 cargo-generate = "0.23.10"
 
 # On wasm32, uuid's v4 feature needs a JS entropy source (crypto.getRandomValues).
