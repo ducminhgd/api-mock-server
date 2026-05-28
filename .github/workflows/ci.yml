@@ -26,6 +26,7 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target
+            rustup target add wasm32-unknown-unknown
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Format check

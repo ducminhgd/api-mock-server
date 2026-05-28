@@ -55,11 +55,11 @@ serde_json = "1"
 zip = { version = "2", optional = true }
 uuid = { version = "1", features = ["serde", "v4"] }
 chrono = { version = "0.4", features = ["serde"] }
-wasm-bindgen = "0.2"
-cargo-leptos = "0.3.6"
+rhai = "=1.24.0"
 rhai_codegen = "3.2.0"
-rhai = "1.24"
+cargo-leptos = "0.3.6"
 cargo-generate = "0.23.10"
+wasm-bindgen = "0.2"
 
 # On wasm32, uuid's v4 feature needs a JS entropy source (crypto.getRandomValues).
 # Cargo merges features across sections, so this adds "js" only for WASM builds.
@@ -69,6 +69,7 @@ gloo-net = { version = "0.5", features = ["http", "json"] }
 web-sys = { version = "0.3", features = ["Window", "Storage", "File", "FileList", "HtmlInputElement", "FormData", "Blob", "Url", "HtmlAnchorElement", "Document", "HtmlElement", "Navigator", "Clipboard"] }
 js-sys = "0.3"
 wasm-bindgen-futures = "0.4"
+getrandom = { version = "0.3", features = ["wasm_js"] }
 
 [features]
 default = []

@@ -1,4 +1,4 @@
-.PHONY: install dev build test migrate migrate-revert lint pre-commit setup check create-admin
+.PHONY: clear-cache install dev build test migrate migrate-revert lint pre-commit setup check create-admin
 
 # Load .env if it exists
 ifneq (,$(wildcard .env))
@@ -6,9 +6,17 @@ ifneq (,$(wildcard .env))
   export
 endif
 
+HOST_TARGET := $(shell rustc -vV | grep host | awk '{print $$2}')
+WASM_TARGET := wasm32-unknown-unknown
 DATABASE_URL ?= sqlite://./dev.db
 JWT_SECRET   ?= dev-secret
 
+clear-cache:
+	cargo clean
+	rm -rf $(HOME)/.cargo/registry
+	rm -rf $(HOME)/.cargo/git
+	rm -rf Cargo.lock
+	
 install:
 	cargo update
 	cargo install cargo-leptos --version 0.3.6 --locked
@@ -42,14 +50,15 @@ lint:
 	cargo fmt --all
 
 check:
+	rustup target add $(WASM_TARGET)
 	cargo check --features ssr
-	cargo check --features hydrate --target wasm32-unknown-unknown
+	cargo check --features hydrate --target $(WASM_TARGET)
 
 pre-commit: lint test build
 
 # First-time setup: install toolchain deps and run migrations
-setup:
-	rustup target add wasm32-unknown-unknown
+setup: clear-cache
+	rustup target add $(WASM_TARGET)
 	cargo install cargo-leptos --version 0.3.6 --locked
 	cargo install sqlx-cli --no-default-features --features sqlite --locked
 	DATABASE_URL=$(DATABASE_URL) sqlx database create
